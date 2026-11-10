@@ -1,0 +1,112 @@
+{
+  "summary": {
+    "started_at": 1792495817.8958821,
+    "finished_at": 1792499257.5577598,
+    "autonomy_during_run": "L3",
+    "sessions": [
+      1792495817.8958821,
+      1792498830.0109775
+    ],
+    "passed": 5,
+    "total": 5,
+    "median_detect_s": 18.8,
+    "median_recover_s": 74.6,
+    "false_alarms": 0
+  },
+  "rows": [
+    {
+      "scenario": "quiet",
+      "label": "Quiet period (180s, nothing broken)",
+      "expected": "no incident",
+      "false_alarms": 0,
+      "incidents": [],
+      "pass": true
+    },
+    {
+      "scenario": "slow-inventory",
+      "label": "Slow inventory (gray failure)",
+      "incident": "VGL-0036",
+      "detected": true,
+      "mttd_s": 18.0,
+      "root": "inventory",
+      "root_ok": true,
+      "category": "stuck_process",
+      "category_ok": true,
+      "actions": [
+        "restart inventory"
+      ],
+      "action_ok": true,
+      "status": "RESOLVED",
+      "mttr_s": 73.0,
+      "checkouts_lost": 598,
+      "confidence": "High",
+      "expected": "restart inventory",
+      "pass": true
+    },
+    {
+      "scenario": "payment-leak",
+      "label": "Memory leak in payment",
+      "incident": "VGL-0037",
+      "detected": true,
+      "mttd_s": 24.6,
+      "root": "payment",
+      "root_ok": true,
+      "category": "resource_leak",
+      "category_ok": true,
+      "actions": [
+        "restart payment"
+      ],
+      "action_ok": true,
+      "status": "RESOLVED",
+      "mttr_s": 74.6,
+      "checkouts_lost": 53,
+      "confidence": "High",
+      "expected": "restart payment",
+      "pass": true
+    },
+    {
+      "scenario": "flash-sale",
+      "label": "Flash sale (real demand, 6x)",
+      "incident": "VGL-0038",
+      "detected": true,
+      "mttd_s": 19.5,
+      "root": "payment",
+      "root_ok": true,
+      "category": "load_saturation",
+      "category_ok": true,
+      "actions": [
+        "scale_out payment"
+      ],
+      "action_ok": true,
+      "status": "RESOLVED",
+      "mttr_s": 74.6,
+      "checkouts_lost": 465,
+      "confidence": "High",
+      "expected": "scale out payment",
+      "pass": true,
+      "scaled_in_after_s": 75.3
+    },
+    {
+      "scenario": "bad-deploy",
+      "label": "Bad deploy (payment v2)",
+      "incident": "VGL-0039",
+      "detected": true,
+      "mttd_s": 17.9,
+      "root": "payment",
+      "root_ok": true,
+      "category": "regression_after_change",
+      "category_ok": true,
+      "actions": [
+        "rollback payment"
+      ],
+      "action_ok": true,
+      "status": "RESOLVED",
+      "mttr_s": 77.9,
+      "checkouts_lost": 237,
+      "confidence": "High",
+      "expected": "rollback payment",
+      "pass": true,
+      "scaled_in_after_s": 60.3
+    }
+  ]
+}

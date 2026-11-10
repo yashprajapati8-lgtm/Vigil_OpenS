@@ -1,0 +1,72 @@
+/* VIGIL design tokens.
+   Feel: calm, exact, accountable. A tool for someone woken at 3 a.m.
+   Ground: a warm taupe-to-black backdrop with soft light pools; panels are matte
+   smoked glass over it (blurred, grained, lit from the top-left), and data sits
+   in sunken wells inside them. Three depths, always in this order:
+   backdrop  <  glass panel (raised)  <  wells (sunken) and controls (raised).
+   Colour only means something: green healthy/done, amber waiting/degraded,
+   red failing, teal = VIGIL itself acting (the one accent). Chaos is hatched orange. */
+:root {
+  --taupe: #87776c;
+  --black: #090909;
+  --backdrop:
+    radial-gradient(1100px 620px at 8% -8%, rgba(150, 132, 119, 0.62), transparent 62%),
+    radial-gradient(900px 700px at 96% 108%, rgba(74, 61, 53, 0.55), transparent 60%),
+    linear-gradient(155deg, #6f6158 0%, #3b332e 26%, #171413 56%, #0a0a0a 100%);
+  /* Fine film grain: makes the glass read as matte, not plastic. */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+
+  /* Surfaces */
+  --glass: rgba(21, 18, 16, 0.74);
+  --glass-strong: rgba(19, 16, 15, 0.9);
+  --glass-blur: blur(22px) saturate(1.25);
+  --glass-edge: linear-gradient(150deg, rgba(255, 255, 255, 0.30) 0%, rgba(255, 255, 255, 0.08) 20%, rgba(255, 255, 255, 0.035) 55%, rgba(255, 255, 255, 0.10) 100%);
+  --glass-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0) 140px);
+  --well: rgba(7, 6, 5, 0.46);
+  --well-edge: inset 0 1px 2px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.04), 0 1px 0 rgba(255, 255, 255, 0.035);
+  --raise: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 1px 2px rgba(0, 0, 0, 0.45), 0 8px 18px -10px rgba(0, 0, 0, 0.7);
+  --shadow-panel: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 2px 4px rgba(0, 0, 0, 0.25), 0 28px 60px -28px rgba(0, 0, 0, 0.8);
+
+  --panel: #141110;
+  --panel-raised: #1d1917;
+  --panel-sunk: #0d0b0a;
+  --line: rgba(237, 231, 226, 0.08);
+  --line-strong: rgba(237, 231, 226, 0.16);
+
+  /* Text: every pair stays at 4.5:1 or better on the glass, even over the lightest part of the backdrop. */
+  --text: #f1ebe6;
+  --text-2: #bfb4ad;
+  --text-3: #a39890;
+
+  --ok: #3fae6e;
+  --ok-deep: #174f31;
+  --ok-mid: #2a8452;
+  --warn: #e3a73e;
+  --warn-bg: #2a2010;
+  --bad: #e0574c;
+  --bad-bg: #3a1512;
+  --vigil: #4fd1c5;
+  --vigil-bg: #0f1f1d;
+  --chaos: #f07a4a;
+
+  --series-payment: #e3c29b;
+  --series-inventory: #8fb8ff;
+
+  /* Scales */
+  --radius-capsule: 999px;
+  --radius-panel: 22px;
+  --radius-item: 14px;
+  --radius-btn: 10px;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px; --space-7: 48px;
+
+  /* Motion: state changes only. Press 120 ms, hover 180 ms, enter 240 ms, drawers 320 ms. */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --t-press: 120ms;
+  --t-hover: 180ms;
+  --t-enter: 240ms;
+  --t-drawer: 320ms;
+
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}

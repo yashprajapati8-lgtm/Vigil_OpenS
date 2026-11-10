@@ -1,0 +1,226 @@
+name: vigil
+
+# Three networks keep the experiment honest:
+#   app     - services, Prometheus and VIGIL.
+#   chaos   - the chaos controller and each service's admin port. VIGIL's engine is never on it
+#             (the UI's nginx is, only to proxy the Chaos Lab drawer; it has no chaos token).
+#   control - VIGIL's engine and the actuator. Nothing else can reach the actuator.
+networks:
+  app: {}
+  chaos: {}
+  control: {}     # engine <-> actuator only: the one path to the Docker socket
+
+x-service: &service
+  build: ./services
+  restart: "no"            # a crashed service stays down until something fixes it
+  mem_limit: 256m          # gives a memory leak a real ceiling to hit
+  cpus: 1.0
+  environment: &service-env
+    CHAOS_TOKEN: ${CHAOS_TOKEN:?Set CHAOS_TOKEN in .env (copy .env.example)}
+  healthcheck:
+    test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)"]
+    interval: 10s
+    timeout: 3s
+    retries: 3
+  labels:
+    vigil.managed: "true"
+
+services:
+  inventory:
+    <<: *service
+    container_name: inventory
+    command: ["uvicorn", "svc.inventory:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      <<: *service-env
+      SERVICE_NAME: inventory
+      APP_VERSION: v1
+      CHAOS_BIND_HOST: inventory-chaos
+    networks:
+      app: {}
+      chaos: { aliases: [inventory-chaos] }
+    ports: ["8002:8000"]
+    labels:
+      vigil.managed: "true"
+      vigil.service: inventory
+      vigil.version: v1
+
+  payment-v1:
+    <<: *service
+    container_name: payment-v1
+    command: ["uvicorn", "svc.payment:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      <<: *service-env
+      SERVICE_NAME: payment
+      APP_VERSION: v1
+      INVENTORY_URL: http://inventory:8000
+      CHAOS_BIND_HOST: payment-v1-chaos
+    networks:
+      app: { aliases: [payment] }        # clients call "payment"; versions swap behind it
+      chaos: { aliases: [payment-v1-chaos] }
+    ports: ["8001:8000"]
+    depends_on: [inventory]
+    labels:
+      vigil.managed: "true"
+      vigil.service: payment
+      vigil.version: v1
+
+  # A warm spare: created once (stopped) with
+  #   docker compose --profile replica create payment-replica
+  # VIGIL's actuator starts it when payment runs out of capacity, and stops it again
+  # when traffic is back to normal. It joins the same "payment" name, so traffic
+  # spreads across both instances at once.
+  payment-replica:
+    <<: *service
+    profiles: ["replica"]
+    container_name: payment-replica
+    command: ["uvicorn", "svc.payment:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      <<: *service-env
+      SERVICE_NAME: payment
+      APP_VERSION: v1
+      INVENTORY_URL: http://inventory:8000
+      ADMIN_ENABLED: "false"             # chaos targets the primary only
+    networks:
+      app: { aliases: [payment] }
+    depends_on: [inventory]
+    labels:
+      vigil.managed: "true"
+      vigil.service: payment
+      vigil.version: v1
+      vigil.role: replica
+
+  # The next release of payment. Not started by `docker compose up`: a developer
+  # ships it with scripts/deploy.ps1, which starts v2 behind the same "payment"
+  # name and then stops v1. v2 has a bug baked in (40% of payments fail), so a
+  # restart cannot fix it; only rolling back to v1 can.
+  payment-v2:
+    <<: *service
+    profiles: ["deploy"]
+    container_name: payment-v2
+    command: ["uvicorn", "svc.payment:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      <<: *service-env
+      SERVICE_NAME: payment
+      APP_VERSION: v2
+      BUG_ERROR_RATE: "0.4"
+      INVENTORY_URL: http://inventory:8000
+      CHAOS_BIND_HOST: payment-v2-chaos
+    networks:
+      app: { aliases: [payment] }
+      chaos: { aliases: [payment-v2-chaos] }
+    depends_on: [inventory]
+    labels:
+      vigil.managed: "true"
+      vigil.service: payment
+      vigil.version: v2
+
+  loadgen:
+    <<: *service
+    container_name: loadgen
+    command: ["uvicorn", "svc.loadgen:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      <<: *service-env
+      SERVICE_NAME: storefront
+      PAYMENT_URL: http://payment:8000
+      RPS: ${BASE_RPS:-20}
+      CHAOS_BIND_HOST: loadgen-chaos
+    networks:
+      app: {}
+      chaos: { aliases: [loadgen-chaos] }
+    depends_on: [payment-v1]
+    labels:
+      vigil.managed: "false"             # VIGIL never touches the traffic source
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=2d
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks: [app]
+    ports: ["9090:9090"]
+
+  vigil-engine:
+    build: ./engine
+    container_name: vigil-engine
+    environment:
+      PROMETHEUS_URL: http://prometheus:9090
+      VIGIL_DATA_DIR: /data
+      VIGIL_BASELINE_SECONDS: ${VIGIL_BASELINE_SECONDS:-180}
+      VIGIL_ADMIN_TOKEN: ${VIGIL_ADMIN_TOKEN:?Set VIGIL_ADMIN_TOKEN in .env (copy .env.example)}
+      VIGIL_UI_ORIGINS: http://localhost:5173
+      VIGIL_AUTONOMY: ${VIGIL_AUTONOMY:-L2}
+      ACTUATOR_URL: http://actuator:8000
+      ACTUATOR_TOKEN: ${VIGIL_ADMIN_TOKEN:?Set VIGIL_ADMIN_TOKEN in .env (copy .env.example)}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}    # optional: without it, diagnosis uses the walk alone
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-120b}
+    volumes:
+      - ./data/vigil:/data               # incidents database + learned baselines
+    networks: [app, control]             # never on the chaos network
+    ports: ["8080:8080"]
+    depends_on: [prometheus, actuator]
+
+  actuator:
+    build: ./actuator
+    container_name: actuator
+    environment:
+      ACTUATOR_TOKEN: ${VIGIL_ADMIN_TOKEN:?Set VIGIL_ADMIN_TOKEN in .env (copy .env.example)}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock   # only this container touches Docker
+    networks: [control]                  # no published port: unreachable from your browser too
+
+  chaos-controller:
+    build: ./chaos
+    container_name: chaos-controller
+    environment:
+      CHAOS_TOKEN: ${CHAOS_TOKEN:?Set CHAOS_TOKEN in .env (copy .env.example)}
+      BASE_RPS: ${BASE_RPS:-20}
+      PAYMENT_ADMIN_URL: http://payment-v1-chaos:9000
+      INVENTORY_ADMIN_URL: http://inventory-chaos:9000
+      LOADGEN_ADMIN_URL: http://loadgen-chaos:9000
+      GROUND_TRUTH_PATH: /data/ground_truth.jsonl
+    volumes:
+      - ./data/chaos:/data               # VIGIL cannot see this folder
+    networks: [chaos]
+    ports: ["8090:8090"]
+
+  # Test tooling, not part of VIGIL: runs every fault and scores VIGIL against the
+  # answer key. Holds the Docker socket only to ship the bad deploy, like CI would.
+  #   docker compose --profile prove run --rm proving-ground
+  proving-ground:
+    build: ./proving_ground
+    profiles: ["prove"]
+    environment:
+      VIGIL_URL: http://vigil-engine:8080
+      CHAOS_URL: http://chaos-controller:8090
+      VIGIL_ADMIN_TOKEN: ${VIGIL_ADMIN_TOKEN:?Set VIGIL_ADMIN_TOKEN in .env (copy .env.example)}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./data/proving-ground:/out       # scorecard.md + scorecard.json
+    networks: [app, chaos]
+
+  ui:
+    build: ./ui
+    container_name: vigil-ui
+    # nginx: the console's static files, plus one origin that proxies to the engine,
+    # the demo shop (payment) and the chaos controller. It holds no tokens.
+    networks: [app, chaos]
+    ports: ["3000:80"]
+    volumes:
+      - ./data/proving-ground:/usr/share/nginx/proving-ground:ro   # the Proving Ground page reads its scorecard here
+    depends_on: [vigil-engine, chaos-controller]
+
+  # Optional public link for phones: a Cloudflare quick tunnel (no account needed) to the
+  # console's phone gateway on port 8081, which serves only the demo checkout (/pay) and
+  # its three routes. The console, Chaos Lab and operator controls stay private.
+  #   docker compose --profile public up -d cloudflared     (the link shows on the Phone page)
+  #   docker compose --profile public stop cloudflared      (link gone)
+  cloudflared:
+    image: cloudflare/cloudflared:2025.11.1
+    container_name: cloudflared
+    profiles: ["public"]
+    command: ["tunnel", "--no-autoupdate", "--protocol", "http2", "--metrics", "0.0.0.0:2000", "--url", "http://vigil-ui:8081"]   # http2 over port 443: works on Wi-Fi that blocks QUIC
+    networks: [app]
+    depends_on: [ui]

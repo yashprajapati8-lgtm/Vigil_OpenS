@@ -1,0 +1,30 @@
+global:
+  scrape_interval: 5s
+  scrape_timeout: 4s
+  evaluation_interval: 5s
+
+# The `service` label is attached here, per target, so VIGIL can group by
+# service no matter how many containers (versions, replicas) back it.
+scrape_configs:
+  - job_name: payment
+    static_configs:
+      - targets: ["payment-v1:8000"]
+        labels: { service: payment, slot: v1 }
+      # Only running after a deploy. While it is absent this target is simply down;
+      # VIGIL takes the best `up` per service, so payment still counts as up.
+      - targets: ["payment-v2:8000"]
+        labels: { service: payment, slot: v2 }
+      # The warm spare, only running while VIGIL has scaled payment out.
+      - targets: ["payment-replica:8000"]
+        labels: { service: payment, slot: replica }
+
+  - job_name: inventory
+    static_configs:
+      - targets: ["inventory:8000"]
+        labels: { service: inventory, slot: v1 }
+
+  # What users feel: checkout success rate and latency, measured at the client.
+  - job_name: storefront
+    static_configs:
+      - targets: ["loadgen:8000"]
+        labels: { service: storefront, slot: v1 }

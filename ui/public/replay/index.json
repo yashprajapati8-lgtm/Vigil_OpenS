@@ -1,0 +1,61 @@
+{
+ "recorded_at": 1792496019.321,
+ "chapters": [
+  {
+   "scenario": "slow-inventory",
+   "label": "Slow inventory (gray failure)",
+   "file": "slow-inventory.json",
+   "result": {
+    "pass": true,
+    "mttd_s": 18.0,
+    "mttr_s": 73.0,
+    "actions": [
+     "restart inventory"
+    ],
+    "root": "inventory"
+   }
+  },
+  {
+   "scenario": "bad-deploy",
+   "label": "Bad deploy (payment v2)",
+   "file": "bad-deploy.json",
+   "result": {
+    "pass": true,
+    "mttd_s": 17.9,
+    "mttr_s": 77.9,
+    "actions": [
+     "rollback payment"
+    ],
+    "root": "payment"
+   }
+  },
+  {
+   "scenario": "flash-sale",
+   "label": "Flash sale (real demand, 6x)",
+   "file": "flash-sale.json",
+   "result": {
+    "pass": true,
+    "mttd_s": 19.5,
+    "mttr_s": 74.6,
+    "actions": [
+     "scale_out payment"
+    ],
+    "root": "payment"
+   }
+  },
+  {
+   "scenario": "payment-leak",
+   "label": "Memory leak in payment",
+   "file": "payment-leak.json",
+   "result": {
+    "pass": true,
+    "mttd_s": 24.6,
+    "mttr_s": 74.6,
+    "actions": [
+     "restart payment"
+    ],
+    "root": "payment"
+   }
+  }
+ ]
+}
