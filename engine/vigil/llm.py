@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 log = logging.getLogger("vigil.llm")
 
-SYSTEM_PROMPT = """You are the diagnosis component of VIGIL, a reliability engine.
+_PROMPT_TEMPLATE = """You are the diagnosis component of VIGIL, a reliability engine.
 You receive an evidence pack about one incident across microservices: per-service
 signals with baselines and z-scores (robust standard deviations from normal),
 onset times, call edges between services, and recent version changes.
@@ -43,7 +43,7 @@ Categories:
   flat or lower: stuck workers, blocked connections, a runaway loop.
 - load_saturation: traffic (rps) far ABOVE normal and CPU per request roughly
   normal: real demand beyond capacity. Never use it when traffic is flat or down.
-  Also use it when storefront checkout_attempts_per_s is far above its baseline
+  Also use it when @ENTRY@ @DEMAND@ is far above its baseline
   (2.5x or more) and the service customers reach first is slow, failing or not
   answering (up = 0): it is overloaded by demand, not crashed or stuck. Under
   overload, CPU per request inflates from queueing; that does not make it stuck.
@@ -63,6 +63,15 @@ Reply with JSON only, exactly this shape:
  "hypothesis": "one or two sentences, under 300 characters",
  "evidence_ids": ["E1", "..."],
  "ruled_out": [{"service": "...", "why": "..."}]}"""
+
+
+def system_prompt(entry: str = "storefront", demand_signal: str = "checkout_attempts_per_s") -> str:
+    """The prompt for this site: names the entry service and its demand signal as
+    they appear in the evidence (vigil.yaml `customers`)."""
+    return _PROMPT_TEMPLATE.replace("@ENTRY@", entry).replace("@DEMAND@", demand_signal)
+
+
+SYSTEM_PROMPT = system_prompt()   # the built-in demo shop
 
 
 class RuledOut(BaseModel):
@@ -99,9 +108,11 @@ class LLMClient:
     """Groq (OpenAI-compatible) chat completions in JSON mode."""
 
     def __init__(self, api_key: str, model: str, base_url: str = "https://api.groq.com/openai/v1",
-                 timeout_s: float = 8.0, client: httpx.AsyncClient | None = None):
+                 timeout_s: float = 8.0, client: httpx.AsyncClient | None = None,
+                 prompt: str = SYSTEM_PROMPT):
         self.api_key = api_key
         self.model = model
+        self.prompt = prompt
         self._client = client or httpx.AsyncClient(base_url=base_url, timeout=timeout_s)
 
     @property
@@ -129,7 +140,7 @@ class LLMClient:
         """Returns {"status": "ok"|"unavailable"|"rejected", ...}. Never raises."""
         if not self.enabled:
             return {"status": "unavailable", "error": "no GROQ_API_KEY configured"}
-        messages = [{"role": "system", "content": SYSTEM_PROMPT},
+        messages = [{"role": "system", "content": self.prompt},
                     {"role": "user", "content": json.dumps(pack)}]
         started = time.perf_counter()
         last_error = ""

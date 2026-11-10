@@ -114,9 +114,13 @@ class PrometheusCollector:
             "edge_rps": (f"sum by (service, target) (rate(dependency_requests_total[{w}]))", ("service", "target")),
             "edge_fail": (f'sum by (service, target) (rate(dependency_requests_total{{outcome!="ok"}}[{w}]))', ("service", "target")),
             "edge_p95": (f"histogram_quantile(0.95, sum by (service, target, le) (rate(dependency_request_duration_seconds_bucket[{w}])))", ("service", "target")),
-            "user": (f"sum by (outcome) (rate(checkout_requests_total[{w}]))", ("outcome",)),
-            "user_p95": (f"histogram_quantile(0.95, sum by (le) (rate(checkout_duration_seconds_bucket[{w}])))", ()),
+            # What customers come to do (vigil.yaml `customers`), counted by outcome.
+            "user": (f"sum by ({self.s.user_outcome_label}) (rate({self.s.user_metric}[{w}]))",
+                     (self.s.user_outcome_label,)),
         }
+        if self.s.user_duration_metric:
+            q["user_p95"] = (f"histogram_quantile(0.95, sum by (le) "
+                             f"(rate({self.s.user_duration_metric}_bucket[{w}])))", ())
         snap = Snapshot(ts=time.time())
         try:
             results = await asyncio.gather(*(self._by(expr, *labels) for expr, labels in q.values()))
@@ -165,13 +169,16 @@ class PrometheusCollector:
             e.p95_ms = None if p95 is None else p95 * 1000
             snap.edges.append(e)
 
-        ok = r["user"].get(("ok",)) or 0.0
-        # A checkout the shop could not even start (too many already waiting) failed too.
-        failed = (r["user"].get(("failed",)) or 0.0) + (r["user"].get(("dropped",)) or 0.0)
+        # checkout_rps / fail_ratio describe the customer action, whatever vigil.yaml
+        # calls it. Outcomes listed as neither ok nor failed (e.g. a 4xx the customer
+        # caused) are left out of both. In the demo, "dropped" (the shop could not even
+        # start the checkout) is a failure too.
+        ok = sum(r["user"].get((o,)) or 0.0 for o in self.s.user_ok)
+        failed = sum(r["user"].get((o,)) or 0.0 for o in self.s.user_failed)
         total = ok + failed
         snap.user.checkout_rps = total
         if total >= self.s.min_rps_for_rates:
             snap.user.fail_ratio = failed / total
-        p95 = r["user_p95"].get(())
+        p95 = r["user_p95"].get(()) if "user_p95" in r else None
         snap.user.p95_ms = None if p95 is None else p95 * 1000
         return snap

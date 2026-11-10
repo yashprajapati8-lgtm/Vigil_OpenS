@@ -351,6 +351,48 @@ Only High confidence will let VIGIL act alone (step 4). Check your Groq key work
 docker compose exec vigil-engine python -m vigil.llm_check
 ```
 
+## Describe your site: `vigil.yaml`
+
+One file tells VIGIL what it is watching. The shipped [`vigil.yaml`](vigil.yaml) describes
+the demo shop; [`examples/results-portal.yaml`](examples/results-portal.yaml) describes a
+university results portal on results day. Swap the file and VIGIL counts, prices and
+verifies in *your* customers' terms ("~840 result lookups saved"), not checkouts.
+
+```yaml
+version: 1
+site: { name: University results portal }
+customers:
+  entry: web                  # where customers arrive: measured, never touched
+  calls: [results-api]
+  unit: result lookup
+  units: result lookups
+  metric: result_requests_total          # counter of attempts, by outcome
+  ok: [ok, not_found]
+  failed: [failed, timeout]               # anything else counts as neither
+  duration_metric: result_request_duration_seconds   # optional
+services:
+  results-api: { calls: [auth, pdf-render], allow: [restart, rollback, scale_out] }
+  auth:        { allow: [] }              # watch and diagnose, a human fixes
+  pdf-render:  { allow: [restart, scale_out] }
+autonomy: L1
+```
+
+- **Strict on purpose.** A typo in a key, a call to a service that is not listed, an
+  unknown fix or autonomy level stops VIGIL at start with a message naming the exact key.
+  It never watches the wrong thing quietly.
+- **`allow` is a hard rule.** A fix the file does not allow is shown in the decision
+  ("not allowed on auth by vigil.yaml") but never chosen, and a human approval cannot
+  run it either. If it was the best fix, VIGIL escalates and says which fix a human should run.
+- **Engine tuning and secrets stay in `.env`.** `VIGIL_AUTONOMY` in `.env` overrides `autonomy`.
+- **No `vigil.yaml` at the default path** (`/etc/vigil/vigil.yaml`) means the demo shop.
+  `VIGIL_CONFIG` pointing at a missing file is an error.
+
+What each watched service must export (Prometheus, scraped with a `service` label per
+target, see [`prometheus/prometheus.yml`](prometheus/prometheus.yml)): the metrics in
+[the table below](#metrics-exported-by-every-service). `dependency_requests_total` is
+optional but lets the blame walk follow failing calls; `build_info` lets VIGIL see deploys.
+VIGIL acts only on containers labelled `vigil.managed=true` and `vigil.service=<name>`.
+
 ## Engine tests
 
 ```powershell
@@ -359,7 +401,7 @@ pip install -r requirements-dev.txt
 pytest -q
 ```
 
-103 tests, including the leak fixed before the crash, the flash-sale scale-out and scale-in, "real demand is never answered with a restart", the bad-deploy rollback (old version up before the bad one stops; restart never wakes a stopped version), the busy-laptop false alarm (now filtered), the operator lock, the full decide-act-verify loop, approvals, the kill switch, a fault
+162 tests, including the adaptive baseline (traffic tripling over 6 h opens nothing; a slow latency creep is held and reported as drift), `vigil.yaml` validation and allowed-fix rules, the leak fixed before the crash, the flash-sale scale-out and scale-in, "real demand is never answered with a restart", the bad-deploy rollback (old version up before the bad one stops; restart never wakes a stopped version), the busy-laptop false alarm (now filtered), the operator lock, the full decide-act-verify loop, approvals, the kill switch, a fault
 that survives a restart (escalates, no loop), actuator refusals and the policy math. Also 40 simulated clean half-hours with zero false incidents, detection in
 exactly 3 ticks, leak prediction before the crash, telemetry outages, restart mid-incident,
 the blame walk, every category rule, LLM hallucination/outage/retry handling, and the
@@ -368,6 +410,8 @@ confidence matrix.
 ## Layout
 
 ```
+vigil.yaml     your site: services, calls, what customers do, allowed fixes, autonomy
+examples/      vigil.yaml for other sites (results portal)
 ui/            command center + demo shop (React, built into an nginx image that proxies every backend)
 proving_ground/ test harness: injects every fault, scores VIGIL, writes the scorecard (not part of VIGIL)
 scripts/       deploy.ps1: blue/green payment deploys
@@ -402,4 +446,4 @@ data/          vigil/ = incidents DB + baselines; chaos/ = ground truth VIGIL ca
 | `process_cpu_seconds_total`, `process_resident_memory_bytes` | Saturation |
 | `build_info{version}` | Running version, so VIGIL can see deploys |
 | `chaos_fault_active{fault}` | Ground truth only; VIGIL must never read it |
-| `checkout_requests_total{outcome}` (storefront) | What users feel |
+| `checkout_requests_total{outcome}` (storefront) | What users feel (the metric is set per site in `vigil.yaml`) |

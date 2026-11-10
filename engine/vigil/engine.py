@@ -22,7 +22,7 @@ from .diagnosis import (SURGE_FACTOR, CATEGORY_LABEL, blame_walk, build_evidence
                         evidence_types)
 from .incidents import IncidentManager
 from .actuator_client import ActuatorClient
-from .llm import LLMClient
+from .llm import LLMClient, system_prompt
 from .policy import Governor
 from .remediation import Remediator
 from .store import Store
@@ -48,13 +48,14 @@ class Engine:
         self.started_at = time.time()
         self._suspect: set[str] = set()
         self.lock = threading.Lock()
-        self.llm = llm or LLMClient(settings.groq_api_key, settings.groq_model, timeout_s=settings.llm_timeout_s)
+        self.llm = llm or LLMClient(settings.groq_api_key, settings.groq_model, timeout_s=settings.llm_timeout_s,
+                                    prompt=system_prompt(settings.user_facing, settings.demand_signal))
         self.first_flag: dict[str, float] = {}       # when each service's current anomaly began
         self.versions: dict[str, str] = {}
         self.changes: list[dict] = []                # recent version changes (deploys, rollbacks)
         self._due: list[str] = []
         self._diagnosing: set[str] = set()
-        self.governor = governor or Governor(autonomy=settings.autonomy)
+        self.governor = governor or Governor(autonomy=settings.autonomy, allowed=settings.allowed_actions)
         self.remediator = Remediator(
             self, actuator or ActuatorClient(settings.actuator_url, settings.actuator_token), self.governor)
         self._due_remediation: list[str] = []
@@ -294,7 +295,8 @@ class Engine:
             overloaded_down = bool(surge) and root_v is not None and root_v.state == "down"
             medians = {s: d.baseline.medians for s, d in self.detectors.items() if d.baseline}
             pack = build_evidence(inc_id, services, self.verdicts, self.last, medians, onsets, self.changes,
-                                  normal_checkout_rps=self.normal_checkout_rps())
+                                  normal_checkout_rps=self.normal_checkout_rps(), entry=self.s.user_facing,
+                                  demand_signal=self.s.demand_signal, units=self.s.units)
             route = " -> ".join(walk.path)
             ev = self.store.append_event(
                 incident_id=inc_id, stage="diagnose", actor="walk", kind="blame_walk",
@@ -427,6 +429,9 @@ class Engine:
             "uptime_s": round(time.time() - self.started_at),
             "edges": sorted(f"{a}->{b}" for a, b in self.incidents.edges),
             "llm": "on" if self.llm.enabled else "off (no GROQ_API_KEY): diagnoses capped at Medium",
+            "site": {"name": self.s.site_name, "config": self.s.config_path, "entry": self.s.user_facing,
+                     "unit": self.s.unit, "units": self.s.units, "services": list(self.s.monitored),
+                     "allowed": {svc: sorted(self.s.allowed(svc)) for svc in self.s.monitored}},
             "control": self.control(),
         }
 

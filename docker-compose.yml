@@ -147,18 +147,20 @@ services:
     container_name: vigil-engine
     environment:
       PROMETHEUS_URL: http://prometheus:9090
+      VIGIL_CONFIG: /etc/vigil/vigil.yaml   # your site: services, calls, customers, allowed fixes
       VIGIL_DATA_DIR: /data
       VIGIL_BASELINE_SECONDS: ${VIGIL_BASELINE_SECONDS:-180}
       VIGIL_ADAPT: ${VIGIL_ADAPT:-1}
       VIGIL_ADMIN_TOKEN: ${VIGIL_ADMIN_TOKEN:?Set VIGIL_ADMIN_TOKEN in .env (copy .env.example)}
       VIGIL_UI_ORIGINS: http://localhost:5173
-      VIGIL_AUTONOMY: ${VIGIL_AUTONOMY:-L2}
+      VIGIL_AUTONOMY: ${VIGIL_AUTONOMY:-}  # empty: vigil.yaml decides
       ACTUATOR_URL: http://actuator:8000
       ACTUATOR_TOKEN: ${VIGIL_ADMIN_TOKEN:?Set VIGIL_ADMIN_TOKEN in .env (copy .env.example)}
       GROQ_API_KEY: ${GROQ_API_KEY:-}    # optional: without it, diagnosis uses the walk alone
       GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-120b}
     volumes:
       - ./data/vigil:/data               # incidents database + learned baselines
+      - ./vigil.yaml:/etc/vigil/vigil.yaml:ro
     networks: [app, control]             # never on the chaos network
     ports: ["8080:8080"]
     depends_on: [prometheus, actuator]

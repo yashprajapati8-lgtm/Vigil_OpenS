@@ -244,7 +244,9 @@ def classify(root: str, verdict: Verdict | None, recent_changes: list[dict], now
 
 def build_evidence(incident_id: str, services: list[str], verdicts: dict[str, Verdict], snap: Snapshot,
                    medians: dict[str, dict[str, float]], onsets: dict[str, float],
-                   recent_changes: list[dict], normal_checkout_rps: float | None = None) -> dict:
+                   recent_changes: list[dict], normal_checkout_rps: float | None = None,
+                   entry: str = "storefront", demand_signal: str = "checkout_attempts_per_s",
+                   units: str = "checkouts") -> dict:
     """Evidence with stable IDs. Deliberately excludes the walk's verdict."""
     t0 = min(onsets.values()) if onsets else snap.ts
     items: list[dict] = []
@@ -275,9 +277,9 @@ def build_evidence(incident_id: str, services: list[str], verdicts: dict[str, Ve
                 baseline=round(medians.get(s, {}).get(sig, float("nan")), 4) if sig in medians.get(s, {}) else None,
                 z=v.z.get(sig), onset_s=onset(s))
     if snap.user.checkout_rps is not None:
-        add(service="storefront", signal="checkout_attempts_per_s", value=round(snap.user.checkout_rps, 2),
+        add(service=entry, signal=demand_signal, value=round(snap.user.checkout_rps, 2),
             baseline=None if normal_checkout_rps is None else round(normal_checkout_rps, 2),
-            note="customers trying to check out (demand), measured at the client")
+            note=f"customers attempting {units} per second (demand), measured at the client")
     for e in snap.edges:
         if e.caller in services or e.target in services:
             if e.fail_ratio is not None:

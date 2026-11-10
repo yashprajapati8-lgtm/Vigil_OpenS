@@ -128,7 +128,7 @@ class Remediator:
                 if outage > fail_per_min:
                     fail_per_min = outage
                     projected = (f"{diag['root']} hits its memory limit in ~{v.time_to_oom_s:.0f} s; "
-                                 "after that every checkout fails")
+                                 f"after that every {self.e.s.unit} fails")
             now = time.time()
             last_change = next((c for c in reversed(self.e.changes)
                                 if c["service"] == diag["root"] and now - c["ts"] <= self.e.s.change_window_s), None)
@@ -137,7 +137,13 @@ class Remediator:
                 fail_per_min=fail_per_min, checkout_rps=rps, horizon_min=self.e.s.horizon_min,
                 restart_downtime_s=self.e.s.restart_downtime_s, history=self.e.store.outcome_history(),
                 last_change=last_change, spare=self._spare_for(diag["root"]) is not None,
-                root_down=(v is not None and v.state == "down") or bool(self._stuck_primaries(diag["root"])))
+                root_down=(v is not None and v.state == "down") or bool(self._stuck_primaries(diag["root"])),
+                units=self.e.s.units)
+            # vigil.yaml may forbid some fixes on some services: show them, never choose them.
+            for o in options:
+                if o.executable and not self.gov.permits(o):
+                    o.executable = False
+                    o.note += f"; not allowed on {o.target} by vigil.yaml"
             attempts = len(inc["data"].get("actions", []))
             tried = {(a["action"], a["target"]) for a in inc["data"].get("actions", [])}
             viable = [o for o in options if o.action != "wait" and o.executable and o.score > 0
@@ -155,7 +161,8 @@ class Remediator:
             if o.action == "wait":
                 parts.append("wait saves 0")
             else:
-                tag = " (symptom)" if not o.executable else ""
+                tag = (" (not allowed)" if not self.gov.permits(o)
+                       else " (symptom)" if not o.executable else "")
                 parts.append(f"{o.label()}{tag} saves ~{o.saves:,.0f} (score {o.score:,.0f})")
         return " · ".join(parts)
 
@@ -181,7 +188,7 @@ class Remediator:
                 # Nothing VIGIL can safely do, and no checkout is failing: don't page a
                 # human for a blip. Keep watching; it either clears (self-resolved) or
                 # starts hurting users (then the normal path decides or escalates).
-                reason = (f"no checkout is failing, so VIGIL keeps watching before calling a human "
+                reason = (f"no {self.e.s.unit} is failing, so VIGIL keeps watching before calling a human "
                           f"(up to {self.e.s.watch_without_impact_s / 60:.0f} min)")
                 if (inc["data"].get("decision") or {}).get("reason") != reason:
                     self._event(inc_id, "decide", "policy", "watching",
@@ -196,7 +203,16 @@ class Remediator:
                                     for c in self.inventory)):
                     rec += (f" (there is no warm {diag['root']} spare to start; create one with "
                             f"`docker compose --profile replica create {diag['root']}-replica`)")
-                why = "previous fix did not restore service" if retry else f"no safe automatic fix for {CATEGORY_LABEL[diag['category']]} in this build"
+                forbidden = [o for o in plan["options"] if o.action != "wait" and o.score > 0
+                             and not self.gov.permits(o)]
+                if retry:
+                    why = "previous fix did not restore service"
+                elif forbidden:
+                    why = (f"the best fix, {forbidden[0].label()}, is not allowed on {forbidden[0].target} "
+                           f"by vigil.yaml")
+                    rec = f"a human should {forbidden[0].label()} or fix {diag['root']}"
+                else:
+                    why = f"no safe automatic fix for {CATEGORY_LABEL[diag['category']]} in this build"
                 self._escalate(inc_id, f"{why}. Recommended: {rec}", plan)
                 return
             if plan["blockers"]:
@@ -217,8 +233,9 @@ class Remediator:
                         "projected": plan.get("projected"),
                         "horizon_min": self.e.s.horizon_min, "acted_alone": plan["alone"],
                         "why": plan["why_alone"], "autonomy": self.gov.autonomy}
-            rate = (f"~{plan['fail_per_min']:,.0f} failed checkouts/min projected ({plan['projected']})"
-                    if plan.get("projected") else f"~{plan['fail_per_min']:,.0f} failed checkouts/min")
+            units = self.e.s.units
+            rate = (f"~{plan['fail_per_min']:,.0f} failed {units}/min projected ({plan['projected']})"
+                    if plan.get("projected") else f"~{plan['fail_per_min']:,.0f} failed {units}/min")
             headline = f"Decision: {chosen.label()}. Next {self.e.s.horizon_min:.0f} min at {rate}: {self._options_text(plan)}"
             self._event(inc_id, "decide", "policy", "decided", headline, decision)
             self._set_data(inc_id, decision=decision)
@@ -337,7 +354,7 @@ class Remediator:
             self._set_data(inc_id, verify=verify)
             self.e.incidents.transition(
                 inc_id, "VERIFYING", actor="verifier", stage="verify", kind="verifying",
-                summary=(f"Verifying: {', '.join(self.e.incidents.open[inc_id]['services'])} and checkouts must stay "
+                summary=(f"Verifying: {', '.join(self.e.incidents.open[inc_id]['services'])} and {self.e.s.units} must stay "
                          f"normal for {self.e.s.verify_clean_ticks} checks in a row (up to {self.e.s.verify_timeout_s:.0f} s)"))
 
     async def _rollback(self, action_id: str, option: Option, managed: list[dict]) -> list[dict]:
@@ -449,7 +466,7 @@ class Remediator:
                 bad = [s for s in inc["services"] if not (verdicts.get(s) and verdicts[s].state == "healthy")]
                 self._event(inc_id, "verify", "verifier", "verify_failed",
                             f"Not recovered after {self.e.s.verify_timeout_s:.0f} s: "
-                            f"{', '.join(bad) or 'checkouts'} still abnormal ({(fail or 0):.0%} of checkouts failing)",
+                            f"{', '.join(bad) or self.e.s.units} still abnormal ({(fail or 0):.0%} of {self.e.s.units} failing)",
                             {"still_bad": bad, "fail_ratio": fail})
             else:
                 self._set_data(inc_id, verify={**v, "clean": clean})
@@ -469,9 +486,9 @@ class Remediator:
         peak = inc["data"].get("peak_fail_ratio", 0)
         self.e.incidents.transition(
             inc_id, "RESOLVED", actor="verifier", stage="verify", kind="resolved",
-            summary=(f"{inc_id} resolved and verified: checkouts failing {(snap.user.fail_ratio or 0):.0%} "
+            summary=(f"{inc_id} resolved and verified: {self.e.s.units} failing {(snap.user.fail_ratio or 0):.0%} "
                      f"(peak {peak:.0%}){'; ' + root_text if root_text else ''}. "
-                     f"{fmt_duration(mttr)} from first symptom to verified recovery; {lost:,} checkouts failed."),
+                     f"{fmt_duration(mttr)} from first symptom to verified recovery; {lost:,} {self.e.s.units} failed."),
             payload=metrics)
         self.e.reset_persistence(inc["services"])
 

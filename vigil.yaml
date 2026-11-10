@@ -1,0 +1,41 @@
+# vigil.yaml: describe your site to VIGIL.
+#
+# VIGIL reads this once at start. A mistake (a typo in a key, a call to a service
+# that is not listed) stops it with a message naming the exact line, rather than
+# watching the wrong thing quietly. Engine timings and secrets stay in .env.
+#
+# This file describes the demo shop that ships with VIGIL. For another site,
+# see examples/ and docs in README.md ("Describe your site").
+
+version: 1
+
+site:
+  name: Demo shop
+
+# What your customers come to do, and how VIGIL can tell whether it worked.
+# Every decision VIGIL makes is priced in these: "restart saves ~840 checkouts".
+customers:
+  entry: storefront              # where customers arrive. Measured, never touched by VIGIL.
+  calls: [payment]               # the services the entry calls
+  unit: checkout                 # one of them, in words people read...
+  units: checkouts               # ...and many
+  metric: checkout_requests_total        # a Prometheus counter of attempts...
+  outcome_label: outcome                 # ...with this label...
+  ok: [ok]                               # ...these values mean it worked...
+  failed: [failed, dropped]              # ...these mean the customer was let down (anything else counts as neither)
+  duration_metric: checkout_duration_seconds   # optional latency histogram (without _bucket)
+
+# Every service VIGIL watches, who it calls, and which fixes VIGIL may use on it.
+# allow: any of restart, rollback, scale_out. Leave it out to allow all three;
+# [] means VIGIL may watch and diagnose this service but never act on it.
+services:
+  payment:
+    calls: [inventory]
+    allow: [restart, rollback, scale_out]
+  inventory:
+    allow: [restart, rollback, scale_out]
+
+# How much VIGIL may do alone (VIGIL_AUTONOMY in .env wins if it is set):
+#   L0 observe only · L1 propose, a human clicks · L2 act alone on low-risk fixes
+#   when confidence is High · L3 act alone on every allowed fix
+autonomy: L2

@@ -1,0 +1,35 @@
+# Example: a university results portal on results day.
+#
+# Thousands of students refresh at 10:00. The page loads, the spinner freezes,
+# and every health check is green. Here the thing customers come to do is a
+# result lookup, so VIGIL counts, prices and verifies in result lookups.
+#
+# To use it: copy this over vigil.yaml (or set VIGIL_CONFIG to its path) and make
+# sure every service below exports VIGIL's metrics (README, "Describe your site").
+
+version: 1
+
+site:
+  name: University results portal
+
+customers:
+  entry: web                         # the frontend students open
+  calls: [results-api]
+  unit: result lookup
+  units: result lookups
+  metric: result_requests_total      # counter, label outcome = ok | failed | timeout | not_found
+  ok: [ok, not_found]                # "no result yet" is an answer, not a failure
+  failed: [failed, timeout]
+  duration_metric: result_request_duration_seconds
+
+services:
+  results-api:
+    calls: [auth, pdf-render]
+    allow: [restart, rollback, scale_out]
+  auth:
+    allow: []                        # logins: VIGIL watches and diagnoses it, a human decides every fix
+  pdf-render:
+    allow: [restart, scale_out]      # the marksheet PDF: heavy on results day, safe to add capacity
+
+# Results day is not the day to learn to trust a new tool: propose, a human clicks.
+autonomy: L1

@@ -40,15 +40,16 @@ def fmt_duration(seconds: float) -> str:
     return f"{seconds // 60}m {seconds % 60:02d}s" if seconds >= 60 else f"{seconds}s"
 
 
-def severity_for(snap: Snapshot, verdicts: list[Verdict]) -> tuple[str, str]:
+def severity_for(snap: Snapshot, verdicts: list[Verdict], unit: str = "checkout",
+                 units: str = "checkouts") -> tuple[str, str]:
     """Severity is what users feel, not how loud a metric is."""
     fail = snap.user.fail_ratio or 0.0
     p95 = snap.user.p95_ms or 0.0
     if fail >= 0.10:
-        return "critical", f"{fail:.0%} of checkouts failing"
+        return "critical", f"{fail:.0%} of {units} failing"
     if fail >= 0.02 or p95 >= 1000 or any(v.state == "down" for v in verdicts):
-        why = f"{fail:.0%} of checkouts failing" if fail >= 0.02 else (
-            f"checkout p95 {p95 / 1000:.1f}s" if p95 >= 1000 else "a service is down")
+        why = f"{fail:.0%} of {units} failing" if fail >= 0.02 else (
+            f"{unit} p95 {p95 / 1000:.1f}s" if p95 >= 1000 else "a service is down")
         return "major", why
     return "minor", "no user impact yet"
 
@@ -139,7 +140,7 @@ class IncidentManager:
             self._emit(ev)
             return self._refresh(linked)
 
-        severity, sev_why = severity_for(snap, [verdict])
+        severity, sev_why = severity_for(snap, [verdict], self.s.unit, self.s.units)
         inc, ev = self.store.create_incident(
             services=[svc], title=f"Anomaly in {svc}", severity=severity,
             event={"stage": "detect", "actor": "detector", "kind": "incident_opened",
@@ -169,7 +170,7 @@ class IncidentManager:
             lost = int(round(inc["data"].get("failed_checkouts", 0)))
             return self.transition(
                 inc_id, "SELF_RESOLVED", actor="engine", stage="verify", kind="self_resolved",
-                summary=f"{inc_id} recovered on its own after {took} with no action; {lost} checkouts failed",
+                summary=f"{inc_id} recovered on its own after {took} with no action; {lost} {self.s.units} failed",
                 payload={"duration_s": time.time() - inc["opened_at"], "failed_checkouts": lost})
         return inc
 
@@ -179,7 +180,7 @@ class IncidentManager:
             return
         fail = snap.user.fail_ratio or 0.0
         failed_now = fail * (snap.user.checkout_rps or 0.0) * self.s.tick_seconds
-        severity, why = severity_for(snap, verdicts)
+        severity, why = severity_for(snap, verdicts, self.s.unit, self.s.units)
         for inc_id, inc in list(self.open.items()):
             data = {**inc["data"],
                     "failed_checkouts": inc["data"].get("failed_checkouts", 0.0) + failed_now,

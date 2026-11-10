@@ -76,7 +76,7 @@ def price_options(*, root: str, category: str, symptoms: list[str], fail_per_min
                   checkout_rps: float, horizon_min: float, restart_downtime_s: float,
                   history: dict[tuple[str, str], tuple[int, int]],
                   last_change: dict | None = None, spare: bool = False,
-                  root_down: bool = False) -> list[Option]:
+                  root_down: bool = False, units: str = "checkouts") -> list[Option]:
     """last_change: the root's most recent version change, if recent. Only then is
     a rollback an option (there must be a previous version to go back to).
     spare: a stopped warm replica of the root exists, so adding capacity is an option.
@@ -84,7 +84,7 @@ def price_options(*, root: str, category: str, symptoms: list[str], fail_per_min
     at_stake = fail_per_min * horizon_min
     restart_drops = restart_downtime_s * checkout_rps
     options = [Option("wait", None, 0.0, 0.0, 0.0, 0.0,
-                      f"~{fail_per_min:.0f} checkouts keep failing every minute", executable=True)]
+                      f"~{fail_per_min:.0f} {units} keep failing every minute", executable=True)]
 
     prior = PRIORS.get((category, "restart"), 0.3)
     restart_note = f"clears a {category.replace('_', ' ')}"
@@ -137,9 +137,12 @@ class Guardrails:
 class Governor:
     """Who may act, when. Every refusal comes with a reason a human can read."""
 
-    def __init__(self, guardrails: Guardrails | None = None, autonomy: str = "L2"):
+    def __init__(self, guardrails: Guardrails | None = None, autonomy: str = "L2",
+                 allowed: dict[str, frozenset[str]] | None = None):
         self.g = guardrails or Guardrails()
         self.autonomy = autonomy
+        # Fixes vigil.yaml allows per service (missing service: all of them).
+        self.allowed = allowed or {}
         self.paused = False
         self.history: list[dict] = []    # executed actions: {action, target, ts}
 
@@ -153,6 +156,8 @@ class Governor:
             out.append("telemetry is stale")
         if not option.executable:
             out.append("not a valid fix for the root cause")
+        if not self.permits(option):
+            out.append(f"vigil.yaml does not allow {option.action} on {option.target}")
         if incident_attempts >= self.g.max_attempts:
             out.append(f"already tried {incident_attempts} fixes on this incident")
         recent = [h for h in self.history if now - h["ts"] < self.g.budget_window_s]
@@ -164,6 +169,12 @@ class Governor:
             wait = self.g.cooldown_s - (now - same[-1]["ts"])
             out.append(f"{option.label()} is cooling down ({wait:.0f}s left)")
         return out
+
+    def permits(self, option: Option) -> bool:
+        """Does vigil.yaml allow this fix on this service? Waiting is always allowed."""
+        if option.action == "wait" or option.target not in self.allowed:
+            return True
+        return option.action in self.allowed[option.target]
 
     def may_act_alone(self, option: Option, confidence: str) -> tuple[bool, str]:
         risk = RISK.get(option.action, "high")
