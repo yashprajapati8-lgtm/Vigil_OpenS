@@ -36,6 +36,10 @@ Every 5 seconds it runs one loop: **observe → detect → diagnose → decide �
 - **Detect:** learns each service's normal for 3 minutes, then flags numbers far outside it
   (robust z-scores plus an IsolationForest). It opens an incident only when customers are hurt
   or the anomaly persists, so a busy laptop or a traffic spike doesn't page anyone.
+  After that it **keeps learning** from the last 2 hours of healthy traffic, every 10 minutes,
+  so normal follows real growth. It never learns from an incident, moves at most a little per
+  update, and reports a slow rise in latency or errors as **baseline drift** for a human to
+  accept instead of quietly calling it normal.
 - **Diagnose:** a blame walk follows failing calls downstream until it reaches a service whose
   own dependencies are healthy. An LLM (Groq, gpt-oss-120b) is asked the same question
   **without being shown the walk's answer**. Agreement means High confidence.

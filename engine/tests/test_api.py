@@ -35,3 +35,4 @@ def test_actions_check_the_token_before_touching_the_engine(monkeypatch):
     # Engine is not running here: a bad token must still be a 403, never a 503 that leaks state.
     assert c.post("/api/incidents/VGL-0001/reject", headers={"X-Vigil-Token": "x"}).status_code == 403
     assert c.post("/api/baseline/reset", headers={"X-Vigil-Token": "x"}).status_code == 403
+    assert c.post("/api/baseline/accept?service=payment", headers={"X-Vigil-Token": "x"}).status_code == 403

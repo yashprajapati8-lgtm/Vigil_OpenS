@@ -37,6 +37,16 @@ class Settings:
     baseline_seconds: int = _i("VIGIL_BASELINE_SECONDS", 180)
     min_rps_for_rates: float = _f("VIGIL_MIN_RPS", 0.5)
 
+    # Adaptive baseline: after the first 3 minutes, keep learning normal from healthy
+    # traffic so it never goes stale (see detector.py, "Adapting").
+    adapt: bool = os.getenv("VIGIL_ADAPT", "1") not in ("0", "false", "no", "off")
+    adapt_window_s: float = _f("VIGIL_ADAPT_WINDOW_S", 7200)    # learn from the last 2 h of healthy ticks
+    adapt_every_s: float = _f("VIGIL_ADAPT_EVERY_S", 600)       # re-learn every 10 min
+    adapt_min_s: float = _f("VIGIL_ADAPT_MIN_S", 600)           # ...once it holds 10 min of healthy ticks
+    adapt_hold_s: float = _f("VIGIL_ADAPT_HOLD_S", 120)         # after an incident, wait 2 min before learning
+    adapt_step_z: float = _f("VIGIL_ADAPT_STEP_Z", 1.0)         # normal moves at most 1 sigma per re-learn
+    drift_max_z: float = _f("VIGIL_DRIFT_MAX_Z", 3.0)           # ...and at most 3 sigma from what a human accepted
+
     # Detection rule (see detector.py).
     z_flag: float = _f("VIGIL_Z_FLAG", 3.0)
     z_extreme: float = _f("VIGIL_Z_EXTREME", 6.0)

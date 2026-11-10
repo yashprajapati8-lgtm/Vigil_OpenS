@@ -149,6 +149,7 @@ services:
       PROMETHEUS_URL: http://prometheus:9090
       VIGIL_DATA_DIR: /data
       VIGIL_BASELINE_SECONDS: ${VIGIL_BASELINE_SECONDS:-180}
+      VIGIL_ADAPT: ${VIGIL_ADAPT:-1}
       VIGIL_ADMIN_TOKEN: ${VIGIL_ADMIN_TOKEN:?Set VIGIL_ADMIN_TOKEN in .env (copy .env.example)}
       VIGIL_UI_ORIGINS: http://localhost:5173
       VIGIL_AUTONOMY: ${VIGIL_AUTONOMY:-L2}

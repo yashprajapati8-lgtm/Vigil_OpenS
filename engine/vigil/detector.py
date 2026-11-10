@@ -13,6 +13,23 @@ after 4 clean ticks in a row (hysteresis), so a single noisy sample never acts.
 Robust z = (x - median) / scale, where scale = max(1.4826 * MAD, floors). The
 floors stop a perfectly flat baseline (error rate always 0) from turning the
 first stray error into z = infinity.
+
+Adapting. Real traffic changes: it grows, a deploy shifts latency a little, a busy
+day looks different from a quiet one. A baseline frozen after 3 minutes would
+slowly turn into false alarms or missed faults. So after the first fit VIGIL keeps
+a rolling window of the last 2 hours of healthy ticks and re-learns from it every
+10 minutes, under four rules:
+
+    1. Only healthy ticks are learned: never a flagged tick, never during an open
+       incident, a surge or failing checkouts, and not for 2 minutes after an
+       incident (the ticks just before it are dropped too).
+    2. Normal moves at most 1 sigma per re-learn, so no single window can jump it.
+    3. Latency, errors and CPU per request may rise at most 3 sigma above
+       what a human last accepted. Past that VIGIL holds normal at the cap and
+       reports "baseline drift": a slow creep is a human's call, never silently
+       the new normal.
+    4. Memory growth is never re-learned. Normal memory growth is zero; learning
+       a slow leak would hide it.
 """
 
 from __future__ import annotations
@@ -32,7 +49,7 @@ from .config import Settings
 
 log = logging.getLogger("vigil.detector")
 
-MODEL_VERSION = 2
+MODEL_VERSION = 3
 MIN_SAMPLES = 24
 # Memory that sits higher than normal but has stopped growing is not a failure:
 # after a burst of traffic Python keeps what it allocated. Memory counts as a
@@ -55,6 +72,16 @@ CONTEXT: dict[str, tuple[float, float]] = {
     "cpu_per_req": (0.05, 0.15),
 }
 ALL_SIGNALS = {**SYMPTOMS, **CONTEXT}
+
+# Adapting (see the module docstring). Never re-learned: normal memory growth is zero.
+FROZEN = {"mem_slope_mb_s"}
+# May rise only so far above what a human accepted before it is reported as drift.
+# Left out: CPU, which rightly doubles when traffic doubles (CPU *per request* is
+# guarded instead, so a stuck process still cannot creep in), and memory, which
+# counts only while it grows (see MEM_ALARM_SHARE; leaks are caught by growth rate).
+DRIFT_GUARDED = {"p95_ms", "error_rate", "cpu_per_req"}
+SCALE_STEP = 1.25            # spread may change at most 25% per re-learn...
+SCALE_RANGE = (0.67, 1.5)    # ...and stay within this share of the accepted spread
 
 LABELS = {
     "p95_ms": "latency p95",
@@ -99,6 +126,12 @@ class Baseline:
     n_samples: int
     created_at: float
     version: int = MODEL_VERSION
+    # What a human last accepted as normal (the first fit, or an accepted drift).
+    anchor_medians: dict[str, float] = field(default_factory=dict)
+    anchor_scales: dict[str, float] = field(default_factory=dict)
+    updated_at: float = 0.0                 # last re-learn (0: never re-learned)
+    refits: int = 0
+    drift: dict[str, str] = field(default_factory=dict)   # signal -> plain-English warning
 
     def z(self, sample: ServiceSample) -> dict[str, float]:
         out = {}
@@ -116,8 +149,8 @@ class Baseline:
         return float(np.searchsorted(self.train_scores, score) / len(self.train_scores) * 100)
 
 
-def fit_baseline(service: str, samples: list[ServiceSample]) -> Baseline:
-    """Learn normal from clean samples; calibrate the cut on a held-out tail."""
+def _robust_stats(samples: list[ServiceSample]) -> tuple[dict[str, float], dict[str, float]]:
+    """Median and robust spread per signal, with the floors applied."""
     medians, scales = {}, {}
     for sig, (abs_floor, rel_floor) in ALL_SIGNALS.items():
         values = np.array([getattr(s, sig) for s in samples if getattr(s, sig) is not None], dtype=float)
@@ -127,7 +160,12 @@ def fit_baseline(service: str, samples: list[ServiceSample]) -> Baseline:
         mad = float(np.median(np.abs(values - med)))
         medians[sig] = med
         scales[sig] = max(1.4826 * mad, abs_floor, rel_floor * abs(med))
+    return medians, scales
 
+
+def _fit_forest(samples: list[ServiceSample], medians: dict[str, float],
+                scales: dict[str, float]) -> tuple[IsolationForest, float, np.ndarray]:
+    """Train the forest on z-vectors; calibrate the cut on a held-out tail."""
     def zvec(s: ServiceSample) -> list[float]:
         row = []
         for sig in SYMPTOMS:
@@ -145,7 +183,70 @@ def fit_baseline(service: str, samples: list[ServiceSample]) -> Baseline:
     # forest never trained on. Contamination never decides it.
     cut = float(max(np.quantile(train_scores, 0.995), held_scores.max() if len(held_scores) else 0.0))
     all_scores = np.sort(-forest.score_samples(X))
-    return Baseline(service, medians, scales, forest, cut, all_scores, len(samples), time.time())
+    return forest, cut, all_scores
+
+
+def fit_baseline(service: str, samples: list[ServiceSample]) -> Baseline:
+    """Learn normal from clean samples. This first fit is also the accepted normal."""
+    medians, scales = _robust_stats(samples)
+    forest, cut, all_scores = _fit_forest(samples, medians, scales)
+    return Baseline(service, medians, scales, forest, cut, all_scores, len(samples), time.time(),
+                    anchor_medians=dict(medians), anchor_scales=dict(scales))
+
+
+def _clamp(x: float, lo: float, hi: float) -> float:
+    return min(max(x, lo), hi)
+
+
+def refit_baseline(old: Baseline, samples: list[ServiceSample], settings: Settings,
+                   now: float | None = None) -> Baseline:
+    """Re-learn normal from recent healthy samples, moving it only within the rules
+    in the module docstring. Returns a new Baseline; `old` is left untouched."""
+    now = time.time() if now is None else now
+    fresh_med, fresh_scale = _robust_stats(samples)
+    medians, scales, drift = {}, {}, {}
+    anchor_med, anchor_scale = dict(old.anchor_medians), dict(old.anchor_scales)
+
+    for sig in set(old.medians) | set(fresh_med):
+        abs_floor, rel_floor = ALL_SIGNALS[sig]
+        if sig not in old.medians:
+            # A signal seen for the first time (e.g. no errors were ever measured
+            # before because there was no traffic): learn it as is, accept it as normal.
+            medians[sig], scales[sig] = fresh_med[sig], fresh_scale[sig]
+            anchor_med.setdefault(sig, fresh_med[sig])
+            anchor_scale.setdefault(sig, fresh_scale[sig])
+            continue
+        m0, s0 = old.medians[sig], old.scales[sig]
+        if sig in FROZEN or sig not in fresh_med:
+            medians[sig], scales[sig] = m0, s0
+            continue
+
+        # Rule 2: at most one step per re-learn.
+        step = settings.adapt_step_z * s0
+        m = _clamp(fresh_med[sig], m0 - step, m0 + step)
+        sc = _clamp(fresh_scale[sig], s0 / SCALE_STEP, s0 * SCALE_STEP)
+
+        # Rule 3: a rise past the cap is a human's call. Falling is always fine:
+        # a lower normal only makes detection stricter.
+        am = anchor_med.get(sig, m0)
+        a_sc = anchor_scale.get(sig, s0)
+        if sig in DRIFT_GUARDED:
+            cap = am + settings.drift_max_z * a_sc
+            if m > cap:
+                m = cap
+            if fresh_med[sig] > cap:
+                drift[sig] = (f"{LABELS[sig]} keeps rising: accepted normal {_fmt(sig, am)}, "
+                              f"recent healthy traffic {_fmt(sig, fresh_med[sig])}. "
+                              f"Held at {_fmt(sig, cap)} until someone accepts the change")
+            sc = _clamp(sc, a_sc * SCALE_RANGE[0], a_sc * SCALE_RANGE[1])
+
+        medians[sig] = m
+        scales[sig] = max(sc, abs_floor, rel_floor * abs(m))
+
+    forest, cut, all_scores = _fit_forest(samples, medians, scales)
+    return Baseline(old.service, medians, scales, forest, cut, all_scores, len(samples), old.created_at,
+                    anchor_medians=anchor_med, anchor_scales=anchor_scale,
+                    updated_at=now, refits=old.refits + 1, drift=drift)
 
 
 @dataclass
@@ -161,6 +262,7 @@ class Verdict:
     learning_eta_s: float | None = None   # while learning: seconds until the baseline is ready
     time_to_oom_s: float | None = None
     texts: dict[str, str] = field(default_factory=dict)  # human wording per signal: value vs normal
+    drift: dict[str, str] = field(default_factory=dict)  # baseline drift waiting for a human (see Adapting)
 
 
 class Persistence:
@@ -200,6 +302,15 @@ class ServiceDetector:
         self.learning: list[ServiceSample] = []
         self.learning_started: float | None = None
         self.persistence = Persistence(settings)
+        # Adapting: recent healthy ticks, and when to re-learn from them.
+        tick = max(settings.tick_seconds, 0.001)
+        self.window: deque[ServiceSample] = deque(maxlen=max(int(settings.adapt_window_s / tick), MIN_SAMPLES))
+        self.every_ticks = max(int(settings.adapt_every_s / tick), 1)
+        self.min_window = max(int(settings.adapt_min_s / tick), MIN_SAMPLES)
+        self.hold_ticks = max(int(settings.adapt_hold_s / tick), 0)
+        self.ticks_since_refit = 0
+        self.hold = 0                    # ticks left before learning may resume
+        self.pausing = False             # inside an incident (or its hold)
 
     @property
     def model_path(self) -> Path:
@@ -215,7 +326,13 @@ class ServiceDetector:
         except Exception as exc:  # corrupt or incompatible file: relearn, never crash
             log.warning("discarding unreadable baseline for %s: %s", self.service, exc)
             return False
-        if getattr(bl, "version", None) != MODEL_VERSION:
+        version = getattr(bl, "version", None)
+        if version == 2:
+            # Learned before adapting existed: what it learned is the accepted normal.
+            bl.anchor_medians, bl.anchor_scales = dict(bl.medians), dict(bl.scales)
+            bl.updated_at, bl.refits, bl.drift = 0.0, 0, {}
+            bl.version = MODEL_VERSION
+        elif version != MODEL_VERSION:
             return False
         self.baseline = bl
         return True
@@ -228,6 +345,10 @@ class ServiceDetector:
         self.baseline = None
         self.learning.clear()
         self.learning_started = None
+        self.window.clear()
+        self.ticks_since_refit = 0
+        self.hold = 0
+        self.pausing = False
         self.model_path.unlink(missing_ok=True)
 
     def _learn(self, sample: ServiceSample, now: float) -> Verdict:
@@ -240,6 +361,8 @@ class ServiceDetector:
         progress = min(time_progress, len(self.learning) / MIN_SAMPLES, 1.0)
         if progress >= 1.0:
             self.baseline = fit_baseline(self.service, self.learning)
+            self.window.extend(self.learning)    # the first healthy window seeds adapting
+            self.ticks_since_refit = 0
             self.learning.clear()
             self.save()
             log.info("baseline learned for %s from %d samples, cut=%.3f",
@@ -250,13 +373,54 @@ class ServiceDetector:
         return Verdict(self.service, "learning", learning_progress=round(progress, 3), learning_eta_s=round(eta))
 
     def pause_learning(self) -> None:
-        """Called while an incident is open: never learn from a failure."""
+        """Called every tick while an incident is open: never learn from a failure.
+        The ticks just before it may already have been drifting, so they are dropped,
+        and learning stays off for adapt_hold_s after the incident ends."""
         self.learning.clear()
         self.learning_started = None
+        if not self.pausing:
+            for _ in range(min(self.hold_ticks, len(self.window))):
+                self.window.pop()
+            self.pausing = True
+        self.hold = self.hold_ticks + 1   # +1: the evaluate() of this same tick counts one down
+
+    def accept_drift(self) -> list[str]:
+        """A human says the current normal is right: it becomes the accepted normal,
+        and the drift cap is measured from here. Returns the signals that were drifting."""
+        bl = self.baseline
+        if bl is None:
+            return []
+        accepted = sorted(bl.drift)
+        bl.anchor_medians, bl.anchor_scales = dict(bl.medians), dict(bl.scales)
+        bl.drift = {}
+        self.save()
+        return accepted
+
+    def _adapt(self, sample: ServiceSample, v: Verdict, learn: bool) -> None:
+        """Keep a healthy tick for the next re-learn, and re-learn when due."""
+        if not self.s.adapt or self.baseline is None:
+            return
+        self.ticks_since_refit += 1
+        if self.hold > 0:
+            self.hold -= 1
+            if self.hold == 0:
+                self.pausing = False
+            return
+        if learn and not v.flagged and v.state == "healthy" and sample.rps:
+            self.window.append(sample)
+        if self.ticks_since_refit >= self.every_ticks and len(self.window) >= self.min_window:
+            self.baseline = refit_baseline(self.baseline, list(self.window), self.s)
+            self.ticks_since_refit = 0
+            self.save()
+            log.info("baseline re-learned for %s from %d healthy samples (refit %d)%s", self.service,
+                     self.baseline.n_samples, self.baseline.refits,
+                     f"; drift: {', '.join(self.baseline.drift)}" if self.baseline.drift else "")
 
     # ---- per tick
 
-    def evaluate(self, sample: ServiceSample | None, now: float | None = None) -> Verdict:
+    def evaluate(self, sample: ServiceSample | None, now: float | None = None, learn: bool = True) -> Verdict:
+        """Judge one tick. `learn=False` when the engine knows the system is not in a
+        normal state (surge, failing checkouts, scaled out): judge it, never learn it."""
         now = time.time() if now is None else now
         if sample is None or sample.up is None:
             return Verdict(self.service, "unknown", reasons=["no data"])
@@ -294,4 +458,6 @@ class ServiceDetector:
                 v.reasons.append(f"memory limit in ~{tte:.0f}s")
 
         v.state = "anomalous" if v.flagged else "healthy"
+        v.drift = dict(bl.drift)
+        self._adapt(sample, v, learn)
         return v

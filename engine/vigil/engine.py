@@ -64,6 +64,7 @@ class Engine:
         # does not open again on a quiet anomaly for a while (it would only repeat the
         # same diagnosis and the same escalation). Anything that hurts users still opens.
         self.quiet_until: dict[str, float] = {}
+        self._drift_seen: dict[str, set[str]] = {}   # drift already announced, per service
 
         for svc, det in self.detectors.items():
             if det.load():
@@ -153,11 +154,17 @@ class Engine:
         self._track_versions(snap)
         active = self.incidents.active_services()
         surge = self.surge()
+        hurting = (snap.user.fail_ratio or 0.0) >= self.s.recovered_fail_ratio
         for svc, det in self.detectors.items():
             if svc in active:
                 det.pause_learning()
-            v = det.evaluate(snap.services.get(svc))
+            # Learn normal only from a normal system: no surge, no failing checkouts,
+            # not scaled out by VIGIL, not right after a quiet escalation.
+            learn = (surge is None and not hurting and svc not in self.remediator.scaled
+                     and time.time() >= self.quiet_until.get(svc, 0.0))
+            v = det.evaluate(snap.services.get(svc), learn=learn)
             self.verdicts[svc] = v
+            self._narrate_drift(svc, v)
             if v.flagged:
                 self.first_flag.setdefault(svc, snap.ts)
             elif not det.persistence.active:
@@ -231,6 +238,7 @@ class Engine:
                 det.reset()
             self.quiet_until.clear()
             self.first_flag.clear()
+            self._drift_seen.clear()
             self.governor.history.clear()     # a fresh start gets a fresh action budget
             ev = self.store.append_event(stage="system", actor="human", kind="baseline_reset",
                                          summary=("Fresh start: " + (f"closed {', '.join(closed)}; " if closed else "")
@@ -336,6 +344,25 @@ class Engine:
             self.incidents.record_diagnosis(inc_id, diagnosis, summary)
             return diagnosis
 
+    def _narrate_drift(self, svc: str, v: Verdict) -> None:
+        """Say once when a service's normal keeps rising past what a human accepted."""
+        now = set(v.drift)
+        new = now - self._drift_seen.get(svc, set())
+        self._drift_seen[svc] = now
+        if not new:
+            return
+        ev = self.store.append_event(
+            stage="detect", actor="detector", kind="baseline_drift",
+            summary=f"{svc}: " + "; ".join(v.drift[sig] for sig in sorted(new)),
+            payload={"service": svc, "signals": sorted(new), "drift": v.drift})
+        self.bus.publish({"type": "event", "event": ev})
+
+    def accept_drift(self, svc: str) -> list[str]:
+        with self.lock:
+            accepted = self.detectors[svc].accept_drift()
+            self._drift_seen.pop(svc, None)
+        return accepted
+
     def _narrate_suspicion(self, svc: str, v: Verdict, det: ServiceDetector) -> None:
         """Say so when VIGIL starts watching something, before it is confirmed."""
         z = v.z or {}
@@ -383,6 +410,8 @@ class Engine:
                 "demand": bool(surge and served and v is not None and v.flagged and v.state != "down"),
                 "baseline": None if det.baseline is None else {
                     "samples": det.baseline.n_samples, "created_at": det.baseline.created_at,
+                    "updated_at": det.baseline.updated_at or None, "refits": det.baseline.refits,
+                    "adapting": self.s.adapt, "drift": det.baseline.drift,
                     "medians": {k: round(x, 3) for k, x in det.baseline.medians.items()}},
                 "in_incident": self.incidents.incident_of(svc),
             }

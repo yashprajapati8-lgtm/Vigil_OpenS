@@ -164,6 +164,27 @@ def reset_baseline(service: str | None = None, x_vigil_token: str | None = Heade
     return {"relearning": targets}
 
 
+@app.post("/api/baseline/accept")
+def accept_baseline(service: str, x_vigil_token: str | None = Header(None)):
+    """A human confirms a service's drifted normal is right (e.g. a new, slower but
+    correct version). The drift cap is then measured from the current normal."""
+    require_admin(x_vigil_token)
+    e = _engine()
+    if service not in e.detectors:
+        raise HTTPException(status_code=404, detail=f"unknown service {service}")
+    if e.detectors[service].baseline is None:
+        raise HTTPException(status_code=409, detail="still learning normal; nothing to accept")
+    if e.incidents.incident_of(service):
+        raise HTTPException(status_code=409, detail="cannot accept a new normal during an open incident")
+    accepted = e.accept_drift(service)
+    ev = _store().append_event(stage="system", actor="human", kind="baseline_accepted",
+                               summary=f"{service}: current normal accepted"
+                               + (f" ({', '.join(accepted)} had drifted)" if accepted else ""),
+                               payload={"service": service, "signals": accepted})
+    bus.publish({"type": "event", "event": ev})
+    return {"service": service, "accepted": accepted}
+
+
 @app.post("/api/fresh-start")
 def fresh_start(x_vigil_token: str | None = Header(None)):
     """Close any open incident and relearn normal from scratch. Clear chaos faults first."""
