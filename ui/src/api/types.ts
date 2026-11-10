@@ -53,7 +53,11 @@ export interface Verdict {
   time_to_oom_s?: number | null;
   texts?: Record<string, string>;
   demand?: boolean;
-  baseline: { samples: number; created_at: number; medians: Record<string, number> } | null;
+  baseline: {
+    samples: number; created_at: number; medians: Record<string, number>;
+    // Adaptive baseline (engine 2026-11): absent from older engines and recorded replays.
+    updated_at?: number | null; refits?: number; adapting?: boolean; drift?: Record<string, string>;
+  } | null;
   in_incident: string | null;
 }
 
@@ -72,6 +76,19 @@ export interface Health {
   edges: string[];
   llm: string;
   control: Control;
+  /** The site from vigil.yaml (absent from older engines and recorded replays: the demo shop). */
+  site?: SiteInfo;
+}
+
+export interface SiteInfo {
+  name: string;
+  config: string | null;
+  entry: string;
+  unit: string;
+  units: string;
+  services: string[];
+  allowed: Record<string, string[]>;
+  about?: Record<string, string>;
 }
 
 export interface OptionRow {

@@ -1,6 +1,7 @@
 import { ShieldCheck } from "lucide-react";
 import type { Control, Incident } from "../api/types";
 import { TERMINAL } from "../api/types";
+import { useSite } from "../lib/site";
 import { num } from "../lib/format";
 
 const LEVEL_TEXT: Record<Control["autonomy"], string> = {
@@ -11,6 +12,7 @@ const LEVEL_TEXT: Record<Control["autonomy"], string> = {
 };
 
 export function DecisionPanel({ incident, control }: { incident: Incident | null; control?: Control }) {
+  const site = useSite();
   const decision = incident?.data.decision;
   const diag = incident?.data.diagnosis;
 
@@ -41,9 +43,9 @@ export function DecisionPanel({ incident, control }: { incident: Incident | null
     <section className="panel area-decision" aria-labelledby="decision-title">
       <div className="panel-head">
         <h2 id="decision-title">Why this fix</h2>
-        <span className="panel-sub">checkouts saved in {decision.horizon_min ?? 5} min</span>
+        <span className="panel-sub">{site.units} saved in {decision.horizon_min ?? 5} min</span>
       </div>
-      <p className="panel-caption">Every option VIGIL considered, priced in checkouts it would save in the next {decision.horizon_min ?? 5} minutes. The best safe option wins.</p>
+      <p className="panel-caption">Every option VIGIL considered, priced in {site.units} it would save in the next {decision.horizon_min ?? 5} minutes. The best safe option wins.</p>
       <div className="decision-body">
       <ol className="ledger">
         {opts.map((o) => {

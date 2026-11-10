@@ -14,6 +14,7 @@ site:
 
 customers:
   entry: web                         # the frontend students open
+  about: Where students check results
   calls: [results-api]
   unit: result lookup
   units: result lookups
@@ -24,11 +25,14 @@ customers:
 
 services:
   results-api:
+    about: Looks up a student's marks
     calls: [auth, pdf-render]
     allow: [restart, rollback, scale_out]
   auth:
+    about: Checks roll number and date of birth
     allow: []                        # logins: VIGIL watches and diagnoses it, a human decides every fix
   pdf-render:
+    about: Renders the marksheet PDF
     allow: [restart, scale_out]      # the marksheet PDF: heavy on results day, safe to add capacity
 
 # Results day is not the day to learn to trust a new tool: propose, a human clicks.

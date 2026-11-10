@@ -13,19 +13,21 @@ export interface Step {
   at: string | null; // "T+21s" from the first symptom
 }
 
-const IDLE: Record<Step["key"], string> = {
+const idle = (units: string): Record<Step["key"], string> => ({
   detect: "Watching every service every 5 seconds",
   diagnose: "Blame walk plus an independent LLM check",
-  decide: "Price every fix in failed checkouts",
+  decide: `Price every fix in failed ${units}`,
   act: "Locked actuator: restart, start or stop",
-  verify: "Services and checkouts normal 4 checks in a row",
-};
+  verify: `Services and ${units} normal 4 checks in a row`,
+});
 const LABEL: Record<Step["key"], string> = {
   detect: "Detect", diagnose: "Diagnose", decide: "Decide", act: "Act", verify: "Verify",
 };
 const KEYS: Step["key"][] = ["detect", "diagnose", "decide", "act", "verify"];
 
-export function idleSteps(verdicts: Record<string, Verdict>): Step[] {
+/** `units`: what customers come to do, in plural ("checkouts", "result lookups"; vigil.yaml). */
+export function idleSteps(verdicts: Record<string, Verdict>, units = "checkouts"): Step[] {
+  const IDLE = idle(units);
   const suspect = Object.values(verdicts).find((v) => v.flagged && !v.in_incident);
   return KEYS.map((key) => {
     if (key === "detect" && suspect) {
@@ -36,7 +38,7 @@ export function idleSteps(verdicts: Record<string, Verdict>): Step[] {
   });
 }
 
-export function deriveLoop(inc: Incident, events: VigilEvent[]): Step[] {
+export function deriveLoop(inc: Incident, events: VigilEvent[], units = "checkouts"): Step[] {
   const d = inc.data;
   const onset = Math.min(...Object.values(d.onset ?? {}), inc.opened_at);
   const evs = events.filter((e) => e.incident_id === inc.id);
@@ -44,13 +46,13 @@ export function deriveLoop(inc: Incident, events: VigilEvent[]): Step[] {
   const at = (ts?: number) => (ts ? `T+${duration(ts - onset)}` : null);
   const s = inc.status;
   const steps: Record<Step["key"], Step> = Object.fromEntries(
-    KEYS.map((k) => [k, { key: k, label: LABEL[k], status: "pending" as StepStatus, detail: IDLE[k], at: null }]),
+    KEYS.map((k) => [k, { key: k, label: LABEL[k], status: "pending" as StepStatus, detail: idle(units)[k], at: null }]),
   ) as Record<Step["key"], Step>;
 
   // Detect
   steps.detect.status = "done";
   steps.detect.at = at(inc.opened_at);
-  steps.detect.detail = `${inc.services.join(" and ")} abnormal; ${pct(d.peak_fail_ratio ?? 0)} of checkouts failing at peak`;
+  steps.detect.detail = `${inc.services.join(" and ")} abnormal; ${pct(d.peak_fail_ratio ?? 0)} of ${units} failing at peak`;
 
   // Diagnose
   if (d.diagnosis) {
@@ -68,7 +70,7 @@ export function deriveLoop(inc: Incident, events: VigilEvent[]): Step[] {
   if (s === "AWAITING_APPROVAL" && dec?.action) {
     steps.decide.status = "waiting";
     const chosen = dec.options.find((o) => o.action === dec.action && o.target === dec.target);
-    steps.decide.detail = `Proposes ${chosen?.label ?? `${dec.action} ${dec.target}`} (saves ~${num(chosen?.saves ?? 0)} checkouts). Confidence ${d.diagnosis?.confidence ?? "not high"}, so a human approves`;
+    steps.decide.detail = `Proposes ${chosen?.label ?? `${dec.action} ${dec.target}`} (saves ~${num(chosen?.saves ?? 0)} ${units}). Confidence ${d.diagnosis?.confidence ?? "not high"}, so a human approves`;
   } else if (dec?.status === "blocked") {
     steps.decide.status = "waiting";
     steps.decide.detail = `Holding: ${dec.reason}`;
@@ -77,10 +79,10 @@ export function deriveLoop(inc: Incident, events: VigilEvent[]): Step[] {
     steps.decide.status = "done";
     steps.decide.at = at(decidedEv?.ts ?? last("decided")?.ts);
     const how = last("approved") ? "approved by a human" : dec.acted_alone ? `acting alone at ${dec.autonomy}` : "";
-    steps.decide.detail = `${chosen?.label ?? `${dec.action} ${dec.target}`}: saves ~${num(chosen?.saves ?? 0)} checkouts${how ? `, ${how}` : ""}`;
+    steps.decide.detail = `${chosen?.label ?? `${dec.action} ${dec.target}`}: saves ~${num(chosen?.saves ?? 0)} ${units}${how ? `, ${how}` : ""}`;
   } else if (s === "DIAGNOSED") {
     steps.decide.status = "active";
-    steps.decide.detail = "Pricing every option in failed checkouts";
+    steps.decide.detail = `Pricing every option in failed ${units}`;
   }
 
   // Act
@@ -103,11 +105,11 @@ export function deriveLoop(inc: Incident, events: VigilEvent[]): Step[] {
   // Verify and terminal states
   if (s === "VERIFYING") {
     steps.verify.status = "active";
-    steps.verify.detail = `Services and checkouts: ${d.verify?.clean ?? 0} of 4 clean checks`;
+    steps.verify.detail = `Services and ${units}: ${d.verify?.clean ?? 0} of 4 clean checks`;
   } else if (s === "RESOLVED") {
     steps.verify.status = "done";
     steps.verify.at = at(inc.closed_at ?? undefined);
-    steps.verify.detail = `Recovered and verified; ${num(d.metrics?.failed_checkouts ?? d.failed_checkouts ?? 0)} checkouts failed in total`;
+    steps.verify.detail = `Recovered and verified; ${num(d.metrics?.failed_checkouts ?? d.failed_checkouts ?? 0)} ${units} failed in total`;
   } else if (s === "SELF_RESOLVED") {
     for (const k of ["decide", "act"] as const) {
       if (steps[k].status === "pending") {

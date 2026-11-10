@@ -3,6 +3,8 @@ import type { Incident, Verdict, VigilEvent } from "../api/types";
 import { TERMINAL } from "../api/types";
 import { duration, num, pct } from "../lib/format";
 import { deriveLoop, idleSteps, type Step } from "../lib/loop";
+import { upper, useSite } from "../lib/site";
+import { Tween } from "../lib/tween";
 
 const ICON = { detect: Eye, diagnose: Search, decide: Scale, act: Zap, verify: ShieldCheck };
 
@@ -26,7 +28,10 @@ function chipFor(inc: Incident | null, steps: Step[]): { cls: string; text: stri
 export function LoopStepper({ incident, events, verdicts, compact = false }: {
   incident: Incident | null; events: VigilEvent[]; verdicts: Record<string, Verdict>; compact?: boolean;
 }) {
-  const steps = incident ? deriveLoop(incident, events) : idleSteps(verdicts);
+  const site = useSite();
+  const steps = incident ? deriveLoop(incident, events, site.units) : idleSteps(verdicts, site.units);
+  const Units = upper(site.units);
+  const lost = (v: number) => <Tween value={v} format={(x) => num(Math.round(x ?? 0))} />;
   const chip = chipFor(incident, steps);
   const open = incident && !TERMINAL.includes(incident.status);
   const onset = incident ? Math.min(...Object.values(incident.data.onset ?? {}), incident.opened_at) : 0;
@@ -69,18 +74,18 @@ export function LoopStepper({ incident, events, verdicts, compact = false }: {
           {open ? (
             <>
               <span>Running for<b>{duration(Date.now() / 1000 - onset)}</b></span>
-              <span>Checkouts lost so far<b>{num(Math.round(incident.data.failed_checkouts ?? 0))}</b></span>
+              <span>{Units} lost so far<b>{lost(incident.data.failed_checkouts ?? 0)}</b></span>
               <span>Worst moment<b>{pct(incident.data.peak_fail_ratio ?? 0)} failing</b></span>
             </>
           ) : incident.status === "ESCALATED" ? (
             <>
               <span>Handed to a human after<b>{duration((incident.closed_at ?? onset) - onset)}</b></span>
-              <span>Checkouts lost until then<b>{num(Math.round(incident.data.failed_checkouts ?? 0))}</b></span>
+              <span>{Units} lost until then<b>{lost(incident.data.failed_checkouts ?? 0)}</b></span>
             </>
           ) : (
             <>
               <span>First symptom to recovery<b>{duration(incident.data.metrics?.mttr_s ?? ((incident.closed_at ?? onset) - onset))}</b></span>
-              <span>Checkouts lost<b>{num(incident.data.metrics?.failed_checkouts ?? incident.data.failed_checkouts ?? 0)}</b></span>
+              <span>{Units} lost<b>{lost(incident.data.metrics?.failed_checkouts ?? incident.data.failed_checkouts ?? 0)}</b></span>
             </>
           )}
         </div>

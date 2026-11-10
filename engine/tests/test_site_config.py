@@ -19,7 +19,7 @@ SHIPPED = ROOT / "vigil.yaml"
 RESULTS = ROOT / "examples" / "results-portal.yaml"
 
 SITE_FIELDS = ["site_name", "monitored", "user_facing", "static_edges", "unit", "units", "user_metric",
-               "user_outcome_label", "user_ok", "user_failed", "user_duration_metric", "autonomy"]
+               "user_outcome_label", "user_ok", "user_failed", "user_duration_metric", "autonomy", "about"]
 
 
 def minimal(**over):
@@ -62,6 +62,7 @@ def test_the_results_portal_example_loads(monkeypatch):
     assert ("web", "results-api") in s.static_edges and ("results-api", "pdf-render") in s.static_edges
     assert s.units == "result lookups" and s.demand_signal == "result_lookup_attempts_per_s"
     assert s.allowed("auth") == frozenset() and s.allowed("pdf-render") == {"restart", "scale_out"}
+    assert s.about["web"] == "Where students check results" and s.about["pdf-render"] == "Renders the marksheet PDF"
     assert s.autonomy == "L1"
 
 
@@ -87,6 +88,7 @@ def test_env_autonomy_wins_over_the_file(monkeypatch):
     ({**minimal(), "services": {"api": {"allow": ["reboot"]}}}, "unknown action 'reboot'"),
     ({**minimal(), "services": {"api": {"alow": []}}}, "services.api: unknown key 'alow'"),
     (minimal(autonomy="L4"), "autonomy: 'L4'"),
+    ({**minimal(), "services": {"api": {"about": "x" * 61}}}, "services.api.about: expected one short line"),
     (minimal(customers={"entry": "web", "calls": ["api"], "unit": "order", "units": "orders",
                         "metric": "orders total"}), "customers.metric"),
     (minimal(customers={"entry": "web", "calls": ["api"], "unit": "order", "units": "orders",

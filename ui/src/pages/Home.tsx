@@ -83,7 +83,7 @@ function HeroLoop({ resolvedIn }: { resolvedIn: string | null }) {
 }
 
 const STEPS: Array<[string, string]> = [
-  ["Detect", "Learns each service's normal for 3 minutes, then flags numbers far outside it. Opens an incident only when customers are hurt, so a traffic spike or a busy laptop pages no one."],
+  ["Detect", "Learns each service's normal in 3 minutes and keeps learning from healthy traffic, never from an incident. Flags numbers far outside it, and opens an incident only when customers are hurt, so a traffic spike or a busy laptop pages no one."],
   ["Diagnose", "A blame walk follows failing calls to the service whose own dependencies are healthy. An LLM answers the same question without seeing the walk's answer. Agreement means High confidence."],
   ["Decide", "Prices every possible fix in checkouts saved over the next 5 minutes, minus checkouts it drops. Restarting a symptom scores below zero."],
   ["Act", "Applies the fix through a locked actuator that can only restart, start or stop a labelled container. No shell, no other access."],
@@ -266,7 +266,7 @@ export function Home() {
         <section className="home-section built" aria-labelledby="built-title">
           <h2 id="built-title">Built with</h2>
           <ul className="tech-stack">
-            <li><b>Engine</b> Python, FastAPI, scikit-learn IsolationForest, 104 tests</li>
+            <li><b>Engine</b> Python, FastAPI, scikit-learn IsolationForest, 163 tests</li>
             <li><b>Telemetry</b> Prometheus golden signals</li>
             <li><b>Second opinion</b> Groq, gpt-oss-120b</li>
             <li><b>Console</b> React, TypeScript, Vite, live server-sent events</li>

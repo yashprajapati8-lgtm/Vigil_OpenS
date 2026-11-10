@@ -4,6 +4,8 @@
 // from src/ only, and production talks to the real engine.
 //
 //   PHASE=idle|verifying|approval|resolved|escalated node dev/mock-server.mjs
+//   SITE=results   the same run on examples/results-portal.yaml (web -> results-api -> auth, pdf-render)
+//   DRIFT=inventory  that service's normal keeps rising: the card asks a human to accept it
 import http from "node:http";
 
 const PHASE = process.env.PHASE || "resolved";
@@ -92,7 +94,9 @@ if (process.env.INSTANCES) latest.services.payment.instances = Number(process.en
 const v = (svc, med) => {
   const st = latest.services[svc].state;
   return { service: svc, state: st, flagged: st === "anomalous", reasons: st === "anomalous" ? ["latency p95 2.4 s (normal 24 ms)"] : [], z: {}, score_pct: 50, learning_progress: 1, texts: {},
-    baseline: { samples: 37, created_at: now - 3600, medians: med }, in_incident: incident && status !== "RESOLVED" && status !== "ESCALATED" ? "VGL-0002" : null };
+    baseline: { samples: 1440, created_at: now - 3600, medians: med, updated_at: now - 240, refits: 6, adapting: true,
+      drift: process.env.DRIFT === svc ? { p95_ms: "latency p95 keeps rising: accepted normal 24 ms, recent healthy traffic 39 ms. Held at 39 ms until someone accepts the change" } : {} },
+    in_incident: incident && status !== "RESOLVED" && status !== "ESCALATED" ? "VGL-0002" : null };
 };
 if (process.env.LEARNING) {   // dev: preview the learning screen, e.g. LEARNING=0.42
   for (const [name, val] of Object.entries({ payment: Number(process.env.LEARNING), inventory: Math.min(1, Number(process.env.LEARNING) + 0.2) })) {
@@ -100,9 +104,45 @@ if (process.env.LEARNING) {   // dev: preview the learning screen, e.g. LEARNING
   }
 }
 const control = { autonomy: "L2", paused: false, guardrails: { cooldown_s: 120, max_attempts: 2, budget_actions: 3, budget_window_s: 600 } };
-const health = { status: "ok", telemetry_ok: true, problem: null, last_tick_age_s: 1, uptime_s: 3600, edges: ["payment->inventory", "storefront->payment"], llm: "on", control };
-const state = { health, latest, verdicts: { payment: v("payment", medians(72, 14.8, 54.6)), inventory: v("inventory", medians(24, 6.2, 51.3)), ...state_learning }, open_incidents: incident && !["RESOLVED", "ESCALATED"].includes(status) ? [incident] : [] };
+const health = { status: "ok", telemetry_ok: true, problem: null, last_tick_age_s: 1, uptime_s: 3600, edges: ["payment->inventory", "storefront->payment"], llm: "on", control,
+  site: { name: "Demo shop", config: "/etc/vigil/vigil.yaml", entry: "storefront", unit: "checkout", units: "checkouts", services: ["payment", "inventory"],
+    allowed: { payment: ["restart", "rollback", "scale_out"], inventory: ["restart", "rollback", "scale_out"] },
+    about: { storefront: "Where customers check out", payment: "Charges the card", inventory: "Reserves the stock" } } };
+let state = { health, latest, verdicts: { payment: v("payment", medians(72, 14.8, 54.6)), inventory: v("inventory", medians(24, 6.2, 51.3)), ...state_learning }, open_incidents: incident && !["RESOLVED", "ESCALATED"].includes(status) ? [incident] : [] };
 
+if (process.env.SITE === "results") {
+  // The same run, renamed onto the results portal; plus auth, which stays healthy.
+  const names = [["storefront", "web"], ["payment", "results-api"], ["inventory", "pdf-render"],
+    ["checkouts", "result lookups"], ["checkout", "result lookup"], ["Checkouts", "Result lookups"]];
+  // Field names keep "checkout" (checkout_rps, failed_checkouts): only words people read change.
+  const keep = ["checkout_rps", "failed_checkouts", "checkouts_lost"];
+  const remap = (o) => {
+    let t = JSON.stringify(o);
+    keep.forEach((k, i) => { t = t.split(k).join(`@@${i}@@`); });
+    for (const [a, b] of names) t = t.split(a).join(b);
+    keep.forEach((k, i) => { t = t.split(`@@${i}@@`).join(k); });
+    return JSON.parse(t);
+  };
+  const auth = () => ({ service: "auth", up: true, rps: rnd(130, 150), error_rate: 0, p95_ms: rnd(30, 40), cpu_pct: rnd(9, 12), mem_mb: rnd(70, 72), mem_slope_mb_s: 0, cpu_per_req: 0.08, version: "v3", state: "healthy" });
+  for (const pt of history) {
+    pt.services.auth = auth();
+    pt.edges.push({ caller: "payment", target: "auth", rps: rnd(130, 150), fail_ratio: 0, p95_ms: rnd(30, 40) });
+    pt.user.checkout_rps *= 7; pt.services.payment.rps *= 7; pt.services.inventory.rps *= 3;
+  }
+  const h2 = remap(history); history.length = 0; history.push(...h2);
+  const e2 = remap(events); events.length = 0; events.push(...e2);
+  state = remap(state);
+  state.latest = history[history.length - 1];
+  state.verdicts.auth = { service: "auth", state: "healthy", flagged: false, reasons: [], z: {}, score_pct: 40, learning_progress: 1, texts: {},
+    baseline: { samples: 1440, created_at: now - 3600, medians: { p95_ms: 34, error_rate: 0, cpu_pct: 10, mem_mb: 71, mem_slope_mb_s: 0, rps: 140, cpu_per_req: 0.08 },
+      updated_at: now - 240, refits: 6, adapting: true, drift: {} }, in_incident: null };
+  Object.assign(health, { edges: ["web->results-api", "results-api->auth", "results-api->pdf-render"],
+    site: { name: "University results portal", config: "/etc/vigil/vigil.yaml", entry: "web", unit: "result lookup", units: "result lookups",
+      services: ["results-api", "auth", "pdf-render"], allowed: { "results-api": ["restart", "rollback", "scale_out"], auth: [], "pdf-render": ["restart", "scale_out"] },
+      about: { web: "Where students check results", "results-api": "Looks up a student's marks", auth: "Checks roll number and date of birth", "pdf-render": "Renders the marksheet PDF" } } });
+  state.health = health;
+  if (incident) Object.assign(incident, remap(incident));
+}
 const send = (res, code, body) => { res.writeHead(code, { "Content-Type": "application/json" }); res.end(JSON.stringify(body)); };
 http.createServer((req, res) => {
   if (process.env.DELAY && req.url.startsWith("/api/state")) {   // dev: preview loading skeletons
@@ -116,6 +156,7 @@ http.createServer((req, res) => {
   if (p === "/api/events") return send(res, 200, { events });
   if (p === "/api/incidents") return send(res, 200, { incidents: incident ? [incident] : [] });
   if (p.startsWith("/api/incidents/")) return incident ? send(res, 200, { incident, events: events.filter((e) => e.incident_id === "VGL-0002") }) : send(res, 404, { detail: "no such incident" });
+  if (p === "/api/baseline/accept") return req.headers["x-vigil-token"] === "demo" ? send(res, 200, { service: u.searchParams.get("service"), accepted: ["p95_ms"] }) : send(res, 403, { detail: "admin token required" });
   if (p === "/api/operator/check") return req.headers["x-vigil-token"] === "demo" ? send(res, 200, { ok: true }) : send(res, 403, { detail: "admin token required" });
   if (p === "/api/control") return send(res, 200, control);
   if (p === "/proving-ground/scorecard.json") return send(res, 200, { summary: { started_at: now - 1500, finished_at: now - 300, autonomy_during_run: "L3", passed: 6, total: 6, median_detect_s: 13.2, median_recover_s: 68.4, false_alarms: 0 },

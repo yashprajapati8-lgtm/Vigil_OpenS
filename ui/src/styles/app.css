@@ -696,3 +696,56 @@ a { color: var(--vigil); }
 .segmented button:disabled, .switch:disabled, .icon-btn:disabled { cursor: not-allowed; opacity: 0.7; }
 .segmented button:disabled:hover { background: transparent; color: var(--text-2); }
 .segmented button[aria-pressed="true"]:disabled { opacity: 1; color: #15110f; background: linear-gradient(180deg, #fbf7f3, #ddd5cf); }
+
+/* ---------- service map: any shape of site (vigil.yaml) ---------- */
+/* Several calls out of one service: cards stack in columns by call depth and the
+   calls are SVG curves measured from the cards (see ServiceMap.tsx, Edges). */
+.map-graph { position: relative; display: grid; align-items: center; padding-top: 16px; }
+.map-col { display: flex; flex-direction: column; justify-content: center; gap: 26px; min-width: 0; }
+.map-col > .node { flex: none; }
+.map-gutter { min-height: 1px; }
+.map-edges { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; z-index: 0; }
+.map-col { position: relative; z-index: 1; }
+.map-edge { fill: none; stroke: #6a605a; stroke-width: 2; stroke-linecap: round; transition: stroke 0.6s ease, stroke-width 0.6s ease; }
+.map-edge[data-bad] { stroke: var(--bad); stroke-width: 2.5; stroke-dasharray: 9 5; animation: vg-flow 0.9s linear infinite; }
+@keyframes vg-flow { to { stroke-dashoffset: -28; } }
+.map-walk { fill: var(--vigil); filter: drop-shadow(0 0 6px rgba(79, 209, 197, 0.85)); }
+.edge-label {
+  position: absolute; z-index: 2; transform: translate(-50%, calc(-100% - 7px)); display: flex; flex-direction: column; align-items: center;
+  padding: 2px 8px; border-radius: 8px; background: rgba(27, 23, 21, 0.82); backdrop-filter: blur(4px);
+  font-size: 12.5px; line-height: 1.3; color: var(--text-3); white-space: nowrap; font-variant-numeric: tabular-nums; pointer-events: none;
+}
+.edge-label:empty { display: none; }
+.edge-label b { font-size: 13.5px; font-weight: 600; color: #f9a39b; }
+.wire-label span, .edge-label span { font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) { .map-edge[data-bad] { animation: none; } }
+
+/* A state word that changes ("healthy" -> "root cause") fades in instead of snapping. */
+.node-state-text { animation: vg-state 0.45s var(--ease-out); }
+@keyframes vg-state { from { opacity: 0; transform: translateY(3px); } }
+@media (prefers-reduced-motion: reduce) { .node-state-text { animation: none; } }
+
+/* What VIGIL currently believes is normal for a service (adaptive baseline). */
+.node-learned { margin: -2px 0 0; display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--text-3); }
+.node-learned-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: #6a605a; }
+.node-learned-dot[data-on] { background: var(--vigil); box-shadow: 0 0 0 0 rgba(79, 209, 197, 0.5); animation: vg-ping 3.2s ease-out infinite; }
+@keyframes vg-ping { 0% { box-shadow: 0 0 0 0 rgba(79, 209, 197, 0.45); } 60%, 100% { box-shadow: 0 0 0 6px rgba(79, 209, 197, 0); } }
+@media (prefers-reduced-motion: reduce) { .node-learned-dot[data-on] { animation: none; } }
+
+/* Baseline drift: normal keeps rising past what a human accepted. A human decides. */
+.node-drift {
+  display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 12px;
+  background: rgba(227, 167, 62, 0.09); border: 1px solid rgba(227, 167, 62, 0.42);
+  animation: vg-enter var(--t-enter) var(--ease-out);
+}
+.node-drift-head { margin: 0; display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; color: #f3b85c; }
+.node-drift-text { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--text-2); }
+.node-drift-btn { align-self: flex-start; }
+.node-drift-ok { margin: 0; display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: #9fe0c0; }
+.node-drift-err { margin: 0; font-size: 12px; color: #f9a39b; }
+@media (prefers-reduced-motion: reduce) { .node-drift { animation: none; } }
+.node-drift-text { display: grid; gap: 1px; }
+.node-drift-what { color: var(--text-3); font-size: 12px; }
+.node-drift-move { font-size: 14px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.node-drift-move b { color: #f3b85c; font-weight: 600; }
+.node-drift-held { font-size: 12px; color: var(--text-3); }

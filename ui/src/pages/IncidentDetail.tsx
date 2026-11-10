@@ -8,10 +8,11 @@ import { Narration } from "../components/Narration";
 import { cap, CATEGORY_LABEL, clock, duration, num, pct } from "../lib/format";
 import { Link } from "../lib/router";
 import { useVigil } from "../state/vigil";
+import { upper, useSite } from "../lib/site";
 import { RowsSkeleton } from "../components/Skeletons";
 import { statusChip } from "./Incidents";
 
-function postmortem(i: Incident, events: VigilEvent[]): string {
+function postmortem(i: Incident, events: VigilEvent[], units = "checkouts"): string {
   const d = i.data.diagnosis;
   const dec = i.data.decision;
   const onset = Math.min(...Object.values(i.data.onset ?? {}), i.opened_at);
@@ -24,7 +25,7 @@ function postmortem(i: Incident, events: VigilEvent[]): string {
     `- First symptom: ${new Date(onset * 1000).toISOString()}`,
     `- Time to detect: ${i.data.metrics ? duration(i.data.metrics.mttd_s) : duration(i.opened_at - onset)}`,
     `- First symptom to recovery: ${i.data.metrics ? duration(i.data.metrics.mttr_s) : i.closed_at ? duration(i.closed_at - onset) : "ongoing"}`,
-    `- Checkouts lost: ${num(i.data.metrics?.failed_checkouts ?? i.data.failed_checkouts ?? 0)} (peak ${pct(i.data.peak_fail_ratio ?? 0)} failing)`,
+    `- ${upper(units)} lost: ${num(i.data.metrics?.failed_checkouts ?? i.data.failed_checkouts ?? 0)} (peak ${pct(i.data.peak_fail_ratio ?? 0)} failing)`,
     "",
     "## Root cause",
     d ? `${d.root}: ${CATEGORY_LABEL[d.category] ?? d.category}. ${d.category_why}.` : "Not diagnosed.",
@@ -49,6 +50,7 @@ function postmortem(i: Incident, events: VigilEvent[]): string {
 
 export function IncidentDetail({ id }: { id: string }) {
   const { incidents, health } = useVigil();
+  const site = useSite();
   const live = incidents[id];
   const [data, setData] = useState<{ incident: Incident; events: VigilEvent[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -68,7 +70,7 @@ export function IncidentDetail({ id }: { id: string }) {
   const d = inc.data.diagnosis;
 
   const download = () => {
-    const blob = new Blob([postmortem(inc, data.events)], { type: "text/markdown" });
+    const blob = new Blob([postmortem(inc, data.events, site.units)], { type: "text/markdown" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = `${inc.id}-postmortem.md`;

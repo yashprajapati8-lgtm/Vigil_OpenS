@@ -401,7 +401,7 @@ pip install -r requirements-dev.txt
 pytest -q
 ```
 
-162 tests, including the adaptive baseline (traffic tripling over 6 h opens nothing; a slow latency creep is held and reported as drift), `vigil.yaml` validation and allowed-fix rules, the leak fixed before the crash, the flash-sale scale-out and scale-in, "real demand is never answered with a restart", the bad-deploy rollback (old version up before the bad one stops; restart never wakes a stopped version), the busy-laptop false alarm (now filtered), the operator lock, the full decide-act-verify loop, approvals, the kill switch, a fault
+163 tests, including the adaptive baseline (traffic tripling over 6 h opens nothing; a slow latency creep is held and reported as drift), `vigil.yaml` validation and allowed-fix rules, the leak fixed before the crash, the flash-sale scale-out and scale-in, "real demand is never answered with a restart", the bad-deploy rollback (old version up before the bad one stops; restart never wakes a stopped version), the busy-laptop false alarm (now filtered), the operator lock, the full decide-act-verify loop, approvals, the kill switch, a fault
 that survives a restart (escalates, no loop), actuator refusals and the policy math. Also 40 simulated clean half-hours with zero false incidents, detection in
 exactly 3 ticks, leak prediction before the crash, telemetry outages, restart mid-incident,
 the blame walk, every category rule, LLM hallucination/outage/retry handling, and the

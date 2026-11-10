@@ -3,15 +3,19 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Point } from "../api/types";
 import { clock, ms, pct } from "../lib/format";
 import { useVigil } from "../state/vigil";
+import { serviceColor, upper, useSite } from "../lib/site";
 import { LineChart, type Baseline, type Marker, type Series } from "./LineChart";
 
 // Every chart here is drawn from /api/history plus the live stream: the same
 // numbers VIGIL decided on. The panel shows four; clicking it opens all of them.
 
-const SVC = [
-  { name: "payment", raw: "#e3c29b" },
-  { name: "inventory", raw: "#8fb8ff" },
-] as const;
+type Svc = { name: string; raw: string };
+
+/** The watched services and their chart colours, from vigil.yaml (the demo: payment, inventory). */
+function useSvc(): Svc[] {
+  const site = useSite();
+  return useMemo(() => site.services.map((name) => ({ name, raw: serviceColor(site, name) })), [site]);
+}
 
 type SvcMetric = "p95_ms" | "error_rate" | "cpu_pct" | "mem_mb" | "mem_slope_mb_s" | "rps" | "cpu_per_req";
 
@@ -33,7 +37,14 @@ const whole = (unit: string) => (v: number) => `${Math.round(v)}${unit}`;
 
 function useCharts(): { defs: ChartDef[]; byKey: Record<string, ChartDef> } {
   const { verdicts } = useVigil();
+  const site = useSite();
+  const SVC = useSvc();
   return useMemo(() => {
+    const { unit, units } = site;
+    const names = SVC.map((s) => s.name);
+    const who = names.length <= 3 ? names.join(names.length === 2 ? " and " : ", ") : "each service";
+    // Calls between watched services (the entry has no call metrics of its own).
+    const calls = site.edges.filter(([a, b]) => names.includes(a) && names.includes(b));
     const svc = (m: SvcMetric): Pick<ChartDef, "series" | "baselines"> => ({
       series: (h) => SVC.map((s) => ({ name: s.name, color: s.raw, values: h.map((p) => p.services[s.name]?.[m] ?? null) })),
       baselines: SVC.flatMap((s) => {
@@ -47,34 +58,40 @@ function useCharts(): { defs: ChartDef[]; byKey: Record<string, ChartDef> } {
 
     const defs: ChartDef[] = [
       {
-        key: "fail", title: "Checkouts failing", label: "Share of checkouts failing over time",
+        key: "fail", title: `${upper(units)} failing`, label: `Share of ${units} failing over time`,
         axis: (v) => `${Math.round(v * 100)}%`, tip: (v) => pct(v), floor: 0.05, ceiling: 1,
-        series: (h) => [{ name: "checkouts failing", color: "#f9a39b", values: h.map((p) => p.user.fail_ratio) }],
+        series: (h) => [{ name: `${units} failing`, color: "#f9a39b", values: h.map((p) => p.user.fail_ratio) }],
         now: (p) => [{ color: "#f9a39b", text: `${pct(p?.user.fail_ratio ?? null)} of ${p?.user.checkout_rps?.toFixed(0) ?? "–"}/s` }],
       },
       {
-        key: "traffic", title: "Checkout traffic", label: "Checkouts per second over time",
+        key: "traffic", title: `${upper(unit)} traffic`, label: `${upper(units)} per second over time`,
         axis: whole(""), tip: (v) => `${v.toFixed(1)}/s`, floor: 10,
-        series: (h) => [{ name: "checkouts per second", color: "#d8cfc8", values: h.map((p) => p.user.checkout_rps) }],
+        series: (h) => [{ name: `${units} per second`, color: "#d8cfc8", values: h.map((p) => p.user.checkout_rps) }],
         now: (p) => [{ color: "#d8cfc8", text: p?.user.checkout_rps != null ? `${p.user.checkout_rps.toFixed(1)}/s` : "–" }],
       },
       {
-        key: "checkout-p95", title: "Checkout latency p95", label: "p95 time to complete a checkout",
+        key: "checkout-p95", title: `${upper(unit)} latency p95`, label: `p95 time to complete a ${unit}`,
         axis: secs, tip: (v) => ms(v), floor: 200,
-        series: (h) => [{ name: "checkout p95", color: "#d8cfc8", values: h.map((p) => p.user.p95_ms) }],
+        series: (h) => [{ name: `${unit} p95`, color: "#d8cfc8", values: h.map((p) => p.user.p95_ms) }],
         now: (p) => [{ color: "#d8cfc8", text: ms(p?.user.p95_ms) }],
       },
-      { key: "p95", title: "Latency p95", label: "p95 latency of payment and inventory", axis: secs, tip: (v) => ms(v), floor: 100,
+      { key: "p95", title: "Latency p95", label: `p95 latency of ${who}`, axis: secs, tip: (v) => ms(v), floor: 100,
         ...svc("p95_ms"), now: svcNow("p95_ms", ms) },
       { key: "errors", title: "Error rate", label: "Share of requests that fail, per service", axis: (v) => `${Math.round(v * 100)}%`, tip: (v) => pct(v), floor: 0.05, ceiling: 1,
         ...svc("error_rate"), now: svcNow("error_rate", (v) => pct(v)) },
-      { key: "edge", title: "payment → inventory calls failing", label: "Share of payment's calls to inventory that fail or time out",
+      { key: "edge",
+        title: calls.length === 1 ? `${calls[0][0]} → ${calls[0][1]} calls failing` : "Calls failing",
+        label: calls.length === 1 ? `Share of ${calls[0][0]}'s calls to ${calls[0][1]} that fail or time out`
+          : "Share of calls between services that fail or time out, per call",
         axis: (v) => `${Math.round(v * 100)}%`, tip: (v) => pct(v), floor: 0.05, ceiling: 1,
-        series: (h) => [{ name: "calls failing", color: "#8fb8ff", values: h.map((p) => p.edges.find((e) => e.caller === "payment" && e.target === "inventory")?.fail_ratio ?? null) }],
-        now: (p) => [{ color: "#8fb8ff", text: pct(p?.edges.find((e) => e.caller === "payment" && e.target === "inventory")?.fail_ratio ?? null) }] },
-      { key: "cpu", title: "CPU", label: "CPU of payment and inventory", axis: whole("%"), tip: (v) => `${v.toFixed(1)}%`, floor: 20,
+        // Coloured by the service being called: a failing call points at it.
+        series: (h) => calls.map(([a, b]) => ({ name: `${a} → ${b}`, color: serviceColor(site, b),
+          values: h.map((p) => p.edges.find((e) => e.caller === a && e.target === b)?.fail_ratio ?? null) })),
+        now: (p) => calls.map(([a, b]) => ({ color: serviceColor(site, b),
+          text: pct(p?.edges.find((e) => e.caller === a && e.target === b)?.fail_ratio ?? null) })) },
+      { key: "cpu", title: "CPU", label: `CPU of ${who}`, axis: whole("%"), tip: (v) => `${v.toFixed(1)}%`, floor: 20,
         ...svc("cpu_pct"), now: svcNow("cpu_pct", n((v) => `${Math.round(v)}%`)) },
-      { key: "mem", title: "Memory", label: "Memory of payment and inventory", axis: whole(""), tip: (v) => `${v.toFixed(1)} MB`, floor: 80,
+      { key: "mem", title: "Memory", label: `Memory of ${who}`, axis: whole(""), tip: (v) => `${v.toFixed(1)} MB`, floor: 80,
         ...svc("mem_mb"), now: svcNow("mem_mb", n((v) => `${Math.round(v)} MB`)) },
       { key: "mem-growth", title: "Memory growth", label: "How fast memory grows: a leak shows as a steady positive line", axis: (v) => v.toFixed(1), tip: (v) => `${v.toFixed(2)} MB/s`, floor: 1,
         ...svc("mem_slope_mb_s"), now: svcNow("mem_slope_mb_s", n((v) => `${v.toFixed(1)} MB/s`)) },
@@ -84,7 +101,7 @@ function useCharts(): { defs: ChartDef[]; byKey: Record<string, ChartDef> } {
         ...svc("cpu_per_req"), now: svcNow("cpu_per_req", n((v) => v.toFixed(2))) },
     ];
     return { defs, byKey: Object.fromEntries(defs.map((d) => [d.key, d])) };
-  }, [verdicts]);
+  }, [verdicts, site, SVC]);
 }
 
 function useOverlays() {
@@ -118,6 +135,7 @@ function ChartCard({ def, history, ts, hover, setHover, height, tooltip }: {
 }
 
 function Key({ full = false }: { full?: boolean }) {
+  const SVC = useSvc();
   return (
     <div className="chart-key">
       {SVC.map((s) => <span key={s.name}><span className="swatch" style={{ background: s.raw }} />{s.name}</span>)}
@@ -183,6 +201,7 @@ function SignalsExplorer({ onClose }: { onClose: () => void }) {
     };
   }, [onClose]);
 
+  const site = useSite();
   const group = (title: string, sub: string, keys: string[]) => (
     <section className="explorer-group" aria-label={title}>
       <div className="explorer-group-head"><h3>{title}</h3><span className="panel-sub">{sub}</span></div>
@@ -208,8 +227,8 @@ function SignalsExplorer({ onClose }: { onClose: () => void }) {
           <button type="button" className="icon-btn" onClick={onClose} aria-label="Close all signals"><X size={18} /></button>
         </div>
         <div className="explorer-body">
-          {group("What users feel", "measured at the storefront", ["fail", "traffic", "checkout-p95"])}
-          {group("payment and inventory", "per service, against what VIGIL learned is normal", ["p95", "errors", "edge", "cpu", "mem", "mem-growth", "rps", "cpu-req"])}
+          {group("What users feel", `measured at ${site.entry}`, ["fail", "traffic", "checkout-p95"])}
+          {group(site.services.length <= 3 ? site.services.join(" and ") : "Every service", "per service, against what VIGIL learned is normal", ["p95", "errors", "edge", "cpu", "mem", "mem-growth", "rps", "cpu-req"])}
         </div>
         <Key full />
       </div>

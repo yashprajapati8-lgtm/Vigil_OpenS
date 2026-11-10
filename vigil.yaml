@@ -16,6 +16,7 @@ site:
 # Every decision VIGIL makes is priced in these: "restart saves ~840 checkouts".
 customers:
   entry: storefront              # where customers arrive. Measured, never touched by VIGIL.
+  about: Where customers check out   # optional, one line the dashboard shows under the name
   calls: [payment]               # the services the entry calls
   unit: checkout                 # one of them, in words people read...
   units: checkouts               # ...and many
@@ -28,11 +29,14 @@ customers:
 # Every service VIGIL watches, who it calls, and which fixes VIGIL may use on it.
 # allow: any of restart, rollback, scale_out. Leave it out to allow all three;
 # [] means VIGIL may watch and diagnose this service but never act on it.
+# about: optional, one line the dashboard shows under the name.
 services:
   payment:
+    about: Charges the card
     calls: [inventory]
     allow: [restart, rollback, scale_out]
   inventory:
+    about: Reserves the stock
     allow: [restart, rollback, scale_out]
 
 # How much VIGIL may do alone (VIGIL_AUTONOMY in .env wins if it is set):

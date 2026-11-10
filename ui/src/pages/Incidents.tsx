@@ -2,6 +2,7 @@ import type { Incident } from "../api/types";
 import { CATEGORY_LABEL, clock, duration, num } from "../lib/format";
 import { Link } from "../lib/router";
 import { LoadError, RowsSkeleton } from "../components/Skeletons";
+import { upper, useSite } from "../lib/site";
 import { useVigil } from "../state/vigil";
 
 export function statusChip(i: Incident): { cls: string; text: string } {
@@ -16,6 +17,7 @@ export function statusChip(i: Incident): { cls: string; text: string } {
 
 export function Incidents() {
   const { incidents, loaded, error, refresh } = useVigil();
+  const site = useSite();
   if (!loaded) return error ? <LoadError message={error} onRetry={refresh} /> : <RowsSkeleton title="Incidents" />;
   const list = Object.values(incidents).sort((a, b) => b.seq - a.seq);
   return (
@@ -30,7 +32,7 @@ export function Incidents() {
         <div className="table-wrap">
           <table className="table">
             <thead>
-              <tr><th>Incident</th><th>Status</th><th>Root cause</th><th>Started</th><th>Symptom to recovery</th><th>Checkouts lost</th></tr>
+              <tr><th>Incident</th><th>Status</th><th>Root cause</th><th>Started</th><th>Symptom to recovery</th><th>{upper(site.units)} lost</th></tr>
             </thead>
             <tbody>
               {list.map((i) => {

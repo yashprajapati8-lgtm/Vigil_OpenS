@@ -3,6 +3,7 @@ import { useState } from "react";
 import { api } from "../api/client";
 import type { RunAsOperator } from "../App";
 import { CATEGORY_LABEL, num } from "../lib/format";
+import { useSite } from "../lib/site";
 import { useVigil } from "../state/vigil";
 
 // Appears by itself when VIGIL needs a human, docked at the bottom so the map
@@ -11,6 +12,7 @@ export function ApprovalCard({ runAsOperator }: { runAsOperator: RunAsOperator }
   const { focus } = useVigil();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const { units } = useSite();
   if (!focus || focus.status !== "AWAITING_APPROVAL" || !focus.data.decision?.action) return null;
   const d = focus.data.decision;
   const diag = focus.data.diagnosis;
@@ -40,7 +42,7 @@ export function ApprovalCard({ runAsOperator }: { runAsOperator: RunAsOperator }
           {diag
             ? <>Root cause: <strong>{diag.root}</strong> ({(CATEGORY_LABEL[diag.category] ?? diag.category).toLowerCase()}), confidence <strong>{diag.confidence}</strong>. VIGIL asks first: {d.why ?? "a human must approve"}. </>
             : <>{focus.title}. VIGIL asks first. </>}
-          This should save about <strong>{num(chosen?.saves ?? 0)}</strong> checkouts in the next {d.horizon_min ?? 5} minutes.
+          This should save about <strong>{num(chosen?.saves ?? 0)}</strong> {units} in the next {d.horizon_min ?? 5} minutes.
         </p>
         {error && <p className="error-text" role="alert">{error}</p>}
       </div>

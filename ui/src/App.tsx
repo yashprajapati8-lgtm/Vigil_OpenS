@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { OperatorContext, type RunAsOperator } from "./lib/operator";
 import { ApprovalCard } from "./components/ApprovalCard";
 import { Banners } from "./components/Banners";
 import { ChaosDrawer } from "./components/ChaosDrawer";
@@ -31,8 +32,7 @@ export function App() {
   );
 }
 
-/** Operator actions need the admin token. Ask for it once, then run what was asked. */
-export type RunAsOperator = (action: () => Promise<void>) => void;
+export type { RunAsOperator };
 
 function Console({ path }: { path: string }) {
   const { focus } = useVigil();
@@ -87,7 +87,7 @@ function Console({ path }: { path: string }) {
           onLocked={() => setUnlocked(false)}
         />
         <Banners />
-        {page}
+        <OperatorContext.Provider value={runAsOperator}>{page}</OperatorContext.Provider>
       </main>
       <ApprovalCard runAsOperator={runAsOperator} />
       {!REPLAY && <PhoneToasts />}

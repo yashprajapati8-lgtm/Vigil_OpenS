@@ -6,6 +6,7 @@ import type { RunAsOperator } from "../App";
 import { isDemand, trafficMultiple } from "../lib/demand";
 import { duration, pct } from "../lib/format";
 import { useVigil } from "../state/vigil";
+import { useSite } from "../lib/site";
 import { useLearning } from "./Banners";
 import { Logo, type LogoTone } from "./Logo";
 import { showGuide } from "./StartHere";
@@ -21,6 +22,7 @@ const LEVELS: Array<{ id: Control["autonomy"]; help: string }> = [
 
 function useStatus() {
   const { connected, loaded, health, focus, verdicts, latest } = useVigil();
+  const { unit, units } = useSite();
   const learn = useLearning();
   if (!loaded && !connected) return { tone: "idle", text: "Connecting to VIGIL" };
   if (!connected) return { tone: "bad", text: "Can't reach the VIGIL engine. Retrying" };
@@ -33,14 +35,15 @@ function useStatus() {
   const off = failing >= 0.02 || vs.some((v) => (v.flagged || v.in_incident || v.state === "down") && !isDemand(v));
   const busy = failing < 0.02 && vs.some((v) => v.flagged && isDemand(v));
   if (focus?.status === "ESCALATED" && off) {
-    return { tone: "bad", text: `${focus.id} escalated: a human has it. ${pct(failing)} of checkouts still failing`, strong: true };
+    return { tone: "bad", text: `${focus.id} escalated: a human has it. ${pct(failing)} of ${units} still failing`, strong: true };
   }
   if (busy && !off) {
-    const x = trafficMultiple(verdicts.payment, latest?.services.payment?.rps);
+    const hot = vs.find((v) => v.flagged && isDemand(v));
+    const x = hot ? trafficMultiple(hot, latest?.services[hot.service]?.rps) : null;
     const fixed = focus?.status === "RESOLVED" ? `${focus.id} fixed by VIGIL in ${duration(focus.data.metrics?.mttr_s ?? 0)}. ` : "";
-    return { tone: "ok", text: `${fixed}Busy: checkout traffic ${x ?? "far above"} normal, and every checkout is served` };
+    return { tone: "ok", text: `${fixed}Busy: ${unit} traffic ${x ?? "far above"} normal, and every ${unit} is served` };
   }
-  if (off) return { tone: "warn", text: `Something looks off (${pct(failing)} of checkouts failing). Confirming before opening an incident` };
+  if (off) return { tone: "warn", text: `Something looks off (${pct(failing)} of ${units} failing). Confirming before opening an incident` };
   if (learn) {
     const eta = learn.eta ?? 0;
     return { tone: "warn", text: `Learning normal traffic: ${Math.round(learn.progress * 100)}%${eta >= 1 ? `, about ${duration(eta)} left` : ""}. Detection starts at 100%` };

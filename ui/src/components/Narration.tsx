@@ -13,7 +13,7 @@ const WHO: Record<string, string> = {
 function tone(e: VigilEvent): string {
   if (/failed|escalated|degraded|rejected/.test(e.kind)) return "tone-bad";
   if (e.kind === "resolved" || e.kind === "self_resolved" || e.kind === "service_recovered" || e.kind === "telemetry_ok") return "tone-ok";
-  if (e.actor === "human" || e.kind === "awaiting_approval" || e.kind === "action_blocked") return "tone-warn";
+  if (e.actor === "human" || e.kind === "awaiting_approval" || e.kind === "action_blocked" || e.kind === "baseline_drift") return "tone-warn";
   if (["policy", "executor", "verifier"].includes(e.actor)) return "tone-vigil";
   return "tone-plain";
 }

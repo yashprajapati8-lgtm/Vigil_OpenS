@@ -64,6 +64,9 @@ class Settings:
     user_duration_metric: str | None = "checkout_duration_seconds"
     # Fixes allowed per service; a service not listed may get every fix in ACTIONS.
     allowed_actions: dict[str, frozenset[str]] = field(default_factory=dict)
+    # One line per service (and the entry) that the dashboard shows under its name.
+    about: dict[str, str] = field(default_factory=lambda: {
+        "storefront": "Where customers check out", "payment": "Charges the card", "inventory": "Reserves the stock"})
     config_path: str | None = None          # the vigil.yaml these settings came from
 
     # Baseline learning.
@@ -179,6 +182,12 @@ def _str_list(where: str, value, pattern: re.Pattern, what: str, allow_empty: bo
     return out
 
 
+def _about(where: str, value) -> str:
+    if not isinstance(value, str) or not 0 < len(value.strip()) <= 60:
+        raise ConfigError(f"{where}: expected one short line (1 to 60 characters)")
+    return value.strip()
+
+
 def parse_site(doc) -> dict:
     """Validate a parsed vigil.yaml and return the Settings fields it sets.
     Every mistake is a ConfigError that names the exact key: VIGIL must never
@@ -201,7 +210,7 @@ def parse_site(doc) -> dict:
     names = [_str(f"services.{k}", k, _NAME, "service name (lowercase letters, digits, - _ .)") for k in services]
 
     c = _keys("customers", doc["customers"], {"entry", "calls", "unit", "units", "metric"},
-              {"outcome_label", "ok", "failed", "duration_metric"})
+              {"outcome_label", "ok", "failed", "duration_metric", "about"})
     entry = _str("customers.entry", c["entry"], _NAME, "service name")
     if entry in services:
         raise ConfigError(f"customers.entry: {entry!r} is also under services. The entry is where customers "
@@ -222,11 +231,16 @@ def parse_site(doc) -> dict:
     out["user_duration_metric"] = None if dur is None else _str("customers.duration_metric", dur, _METRIC,
                                                                  "Prometheus metric name")
 
+    about: dict[str, str] = {}
+    if "about" in c:
+        about[entry] = _about("customers.about", c["about"])
     edges = [(entry, t) for t in entry_calls]
     allowed: dict[str, frozenset[str]] = {}
     for name in names:
         spec = services[name] or {}
-        spec = _keys(f"services.{name}", spec, set(), {"calls", "allow"})
+        spec = _keys(f"services.{name}", spec, set(), {"calls", "allow", "about"})
+        if "about" in spec:
+            about[name] = _about(f"services.{name}.about", spec["about"])
         for t in _str_list(f"services.{name}.calls", spec.get("calls", []), _NAME, "service name", allow_empty=True):
             if t == name:
                 raise ConfigError(f"services.{name}.calls: a service cannot call itself")
@@ -246,6 +260,7 @@ def parse_site(doc) -> dict:
     out["monitored"] = tuple(names)
     out["static_edges"] = tuple(edges)
     out["allowed_actions"] = allowed
+    out["about"] = about
 
     if "autonomy" in doc:
         if doc["autonomy"] not in AUTONOMY_LEVELS:
