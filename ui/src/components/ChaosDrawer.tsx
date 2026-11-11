@@ -1,6 +1,7 @@
 import { X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { api, getToken } from "../api/client";
+import { api } from "../api/client";
+import { useOperator } from "../lib/operator";
 import type { Scenario } from "../api/types";
 import { REPLAY } from "../replay/player";
 import { useLearning } from "./Banners";
@@ -34,6 +35,9 @@ export function ChaosDrawer({ onClose }: { onClose: () => void }) {
   const [scenarios, setScenarios] = useState<Record<string, Scenario> | null>(null);
   const [status, setStatus] = useState<Status | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  // Fresh start's own status, shown right under its button (where the person is looking).
+  const [fresh, setFresh] = useState<{ kind: "settling"; left: number } | { kind: "done"; closed: string[] } | { kind: "error"; msg: string } | null>(null);
+  const runAsOperator = useOperator();
   const [error, setError] = useState<string | null>(null);
   const learning = useLearning();
 
@@ -83,25 +87,23 @@ export function ChaosDrawer({ onClose }: { onClose: () => void }) {
   };
 
   // Clean slate for a demo: clear every fault, let the numbers settle (rates look back
-  // 20 s), then close any open incident and relearn normal. Operator only.
-  const freshStart = async () => {
-    if (!getToken()) {
-      setMessage("Fresh start needs the admin token: unlock with the lock button (top right), then hold again.");
-      return;
-    }
+  // 20 s), then close any open incident and relearn normal. Operator only: when the
+  // console is locked this asks for the token first, then carries on by itself.
+  const SETTLE_S = 25;
+  const freshStart = () => runAsOperator(async () => {
     try {
       await api.post("/chaos/reset");
-      for (let left = 25; left > 0; left -= 1) {
-        setMessage(`Faults cleared. Letting the numbers settle: relearning in ${left} s.`);
+      for (let left = SETTLE_S; left > 0; left -= 1) {
+        setFresh({ kind: "settling", left });
         await new Promise((r) => window.setTimeout(r, 1000));
       }
-      const r = await api.post<{ closed: string[] }>("/api/fresh-start");
-      setMessage(`Fresh start${r.closed?.length ? `: closed ${r.closed.join(", ")}` : ""}. VIGIL is relearning normal (about 3 minutes); faults unlock when it's ready.`);
+      const r = await api.post<{ closed: string[] }>("/api/fresh-start", undefined, true);
+      setFresh({ kind: "done", closed: r.closed ?? [] });
       load();
     } catch (e) {
-      setMessage(e instanceof Error ? `Fresh start failed: ${e.message}` : "Fresh start failed");
+      setFresh({ kind: "error", msg: e instanceof Error ? e.message : "unknown error" });
     }
-  };
+  });
 
   return (
     <>
@@ -160,7 +162,19 @@ export function ChaosDrawer({ onClose }: { onClose: () => void }) {
             : "Reset is for demo re-runs. VIGIL never uses it; it fixes faults with real container actions."}</span>
           {!REPLAY && <>
             <HoldButton className="hold-reset" label="Hold for a fresh start (relearn normal)" doneLabel="Fresh start running"
-              holdMs={1500} onFire={freshStart} />
+              holdMs={1500} onFire={freshStart} disabled={fresh?.kind === "settling"} />
+            {fresh && (
+              <div className="fresh-status" role="status" data-kind={fresh.kind}>
+                {fresh.kind === "settling" && <>
+                  <p>Faults cleared. Letting the numbers settle: VIGIL relearns in <b>{fresh.left} s</b>.</p>
+                  <span className="fresh-bar" aria-hidden="true"><span style={{ width: `${((SETTLE_S - fresh.left + 1) / SETTLE_S) * 100}%` }} /></span>
+                </>}
+                {fresh.kind === "done" && (
+                  <p>Relearning now{fresh.closed.length ? ` (closed ${fresh.closed.join(", ")})` : ""}. Watch the learning chart on the page: about 3 minutes.</p>
+                )}
+                {fresh.kind === "error" && <p>Fresh start failed: {fresh.msg}</p>}
+              </div>
+            )}
             <span className="panel-sub">Clears every fault, closes any open incident and makes VIGIL learn normal again from scratch (about 3 minutes). Needs the admin token.</span>
           </>}
         </div>

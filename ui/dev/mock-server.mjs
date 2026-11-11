@@ -165,6 +165,9 @@ http.createServer((req, res) => {
   if (p === "/api/incidents") return send(res, 200, { incidents: incident ? [incident] : [] });
   if (p.startsWith("/api/incidents/")) return incident ? send(res, 200, { incident, events: events.filter((e) => e.incident_id === "VGL-0002") }) : send(res, 404, { detail: "no such incident" });
   if (p === "/api/baseline/accept") return req.headers["x-vigil-token"] === "demo" ? send(res, 200, { service: u.searchParams.get("service"), accepted: ["p95_ms"] }) : send(res, 403, { detail: "admin token required" });
+  // Like the real engine: no token, no fresh start.
+  if (p === "/api/fresh-start") return req.headers["x-vigil-token"] === "demo" ? send(res, 200, { closed: [], relearning: ["payment", "inventory"] }) : send(res, 403, { detail: "admin token required" });
+  if (p === "/chaos/reset" || p === "/reset") return send(res, 200, { errors: {} });
   if (p === "/api/operator/check") return req.headers["x-vigil-token"] === "demo" ? send(res, 200, { ok: true }) : send(res, 403, { detail: "admin token required" });
   if (p === "/api/control") return send(res, 200, control);
   if (p === "/proving-ground/scorecard.json") return send(res, 200, { summary: { started_at: now - 1500, finished_at: now - 300, autonomy_during_run: "L3", passed: 6, total: 6, median_detect_s: 13.2, median_recover_s: 68.4, false_alarms: 0 },

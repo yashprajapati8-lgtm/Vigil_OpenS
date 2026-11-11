@@ -880,3 +880,14 @@ a { color: var(--vigil); }
   .learning.panel { grid-template-columns: minmax(0, 1fr); padding: 16px; }
   .learning-icon { display: none; }
 }
+
+/* Fresh start's status sits under its own button: the countdown, then "relearning now". */
+.fresh-status { padding: 10px 12px; border-radius: 12px; background: var(--well); box-shadow: var(--well-edge); animation: vg-enter var(--t-enter) var(--ease-out); }
+.fresh-status p { margin: 0; font-size: 13px; line-height: 1.45; color: var(--text-2); }
+.fresh-status b { color: var(--text); font-variant-numeric: tabular-nums; }
+.fresh-status[data-kind="done"] p { color: #9fe0c0; }
+.fresh-status[data-kind="error"] { background: rgba(224, 87, 76, 0.1); box-shadow: none; border: 1px solid rgba(224, 87, 76, 0.4); }
+.fresh-status[data-kind="error"] p { color: #f9a39b; }
+.fresh-bar { display: block; height: 4px; margin-top: 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.06); overflow: hidden; }
+.fresh-bar span { display: block; height: 100%; border-radius: inherit; background: var(--vigil); transition: width 1s linear; }
+@media (prefers-reduced-motion: reduce) { .fresh-status { animation: none; } .fresh-bar span { transition: none; } }

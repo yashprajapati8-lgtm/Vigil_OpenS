@@ -95,7 +95,9 @@ function Console({ path }: { path: string }) {
       </main>
       <ApprovalCard runAsOperator={runAsOperator} />
       {!REPLAY && <PhoneToasts />}
-      {chaosOpen && <ChaosDrawer onClose={() => setChaosOpen(false)} />}
+      {chaosOpen && (
+        <OperatorContext.Provider value={runAsOperator}><ChaosDrawer onClose={() => setChaosOpen(false)} /></OperatorContext.Provider>
+      )}
       {asking && (
         <OperatorModal
           onCancel={() => {
