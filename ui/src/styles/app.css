@@ -749,3 +749,91 @@ a { color: var(--vigil); }
 .node-drift-move { font-size: 14px; color: var(--text-2); font-variant-numeric: tabular-nums; }
 .node-drift-move b { color: #f3b85c; font-weight: 600; }
 .node-drift-held { font-size: 12px; color: var(--text-3); }
+
+/* ---------- connect your app ---------- */
+/* A guide, not a control: the steps on the left, what VIGIL is watching and what it
+   works with on the right. Code sits in sunken wells with one copy button each. */
+.cx { display: grid; gap: 18px; align-items: start; grid-template-columns: minmax(0, 1fr) minmax(280px, 340px); }
+.cx-main { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.cx-side { display: flex; flex-direction: column; gap: 18px; position: sticky; top: 92px; }
+@media (max-width: 1100px) { .cx { grid-template-columns: minmax(0, 1fr); } .cx-side { position: static; } }
+.cx-lede { margin: 8px 0 18px; }
+
+.cx-switch { display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--well); box-shadow: var(--well-edge); }
+.cx-switch button {
+  height: 34px; padding: 0 16px; border: 0; border-radius: 999px; background: transparent; color: var(--text-2);
+  font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; transition: background var(--t-hover) var(--ease-out), color var(--t-hover) var(--ease-out);
+}
+.cx-switch button:hover { color: var(--text); }
+.cx-switch button[aria-checked="true"] { background: linear-gradient(180deg, #2b2623, #1e1a18); box-shadow: var(--raise); color: var(--text); }
+.cx-switch button:focus-visible { outline: 2px solid var(--vigil); outline-offset: 2px; }
+
+/* How VIGIL will talk on the chosen site: the same three lines the console writes. */
+.cx-preview {
+  margin: 16px 0 0; padding: 14px 16px; border-radius: var(--radius-item); background: var(--vigil-bg);
+  border: 1px solid rgba(79, 209, 197, 0.28); display: grid; gap: 7px; animation: vg-enter var(--t-enter) var(--ease-out);
+}
+.cx-preview figcaption { font-size: 12.5px; color: var(--text-3); margin-bottom: 2px; }
+.cx-preview p { margin: 0; font-size: 14px; line-height: 1.45; color: var(--text-2); }
+.cx-tag { display: inline-block; min-width: 88px; font-size: 12.5px; font-weight: 600; color: var(--vigil); }
+@media (prefers-reduced-motion: reduce) { .cx-preview { animation: none; } }
+
+.cx-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 22px; }
+.cx-step { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 14px; }
+.cx-num {
+  width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 14px; font-weight: 600;
+  color: var(--vigil); background: var(--vigil-bg); border: 1px solid rgba(79, 209, 197, 0.35);
+}
+.cx-step-body { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.cx-step-body h3 { margin: 4px 0 0; font-size: 15px; font-weight: 600; color: var(--text); }
+.cx-step-body p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--text-2); max-width: 70ch; }
+.cx-step-body b { color: var(--text); }
+
+.cx-code { position: relative; border-radius: var(--radius-btn); background: var(--well); box-shadow: var(--well-edge); }
+.cx-code pre { margin: 0; padding: 12px 14px; padding-right: 92px; overflow-x: auto; font-family: var(--font-mono); font-size: 13px; line-height: 1.55; color: var(--text); }
+.cx-code pre:focus-visible { outline: 2px solid var(--vigil); outline-offset: 2px; border-radius: var(--radius-btn); }
+.cx-copy {
+  position: absolute; top: 7px; right: 7px; height: 28px; padding: 0 10px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.09);
+  background: linear-gradient(180deg, #2b2623, #1e1a18); box-shadow: var(--raise); color: var(--text-2);
+  font: inherit; font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+}
+.cx-copy:hover { color: var(--text); }
+.cx-copy:focus-visible { outline: 2px solid var(--vigil); outline-offset: 2px; }
+.cx-inline { font-family: var(--font-mono); font-size: 0.92em; padding: 1px 6px; border-radius: 6px; background: var(--well); color: var(--text); overflow-wrap: anywhere; }
+
+.cx-now-site { margin: 0 0 4px; font-size: 18px; font-weight: 600; color: var(--text); }
+.cx-now-line { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--text-2); }
+.cx-now-line b { color: var(--text); font-weight: 600; }
+.cx-now-list { list-style: none; margin: 12px 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.cx-now-list li { display: grid; grid-template-columns: 8px 1fr auto; align-items: baseline; column-gap: 9px; row-gap: 1px; font-size: 13.5px; }
+.cx-dot { width: 8px; height: 8px; border-radius: 50%; background: #6a605a; align-self: center; }
+.cx-dot[data-on] { background: var(--ok); }
+.cx-now-name { font-weight: 600; color: var(--text); }
+.cx-now-state { font-size: 12.5px; color: var(--text-3); }
+.cx-now-state[data-on] { color: #9fe0c0; }
+.cx-now-meta { grid-column: 2 / -1; color: var(--text-3); font-size: 12.5px; }
+
+.cx-ready { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.cx-ready li { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: start; }
+.cx-ready b { display: block; font-size: 14px; font-weight: 600; color: var(--text-2); }
+.cx-ready li[data-ready] b { color: var(--text); }
+.cx-ready small { display: block; font-size: 12.5px; color: var(--text-3); margin-top: 1px; }
+.cx-ready-mark { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; border: 1px dashed var(--line-strong); }
+.cx-ready li[data-ready] .cx-ready-mark { border: 0; background: var(--ok-deep); color: #9fe0c0; }
+.cx-note { margin: 14px 0 0; font-size: 12.5px; color: var(--text-3); }
+@media (max-width: 640px) {
+  .cx-step { grid-template-columns: 26px minmax(0, 1fr); gap: 10px; }
+  .cx-num { width: 26px; height: 26px; font-size: 13px; }
+  .cx-tag { min-width: 0; display: block; }
+}
+
+/* Phone: the top bar holds every page; it may never widen the page itself. Smaller
+   buttons fit them all on a 360 px screen, and past that the bar scrolls on its own. */
+@media (max-width: 920px) {
+  .rail { min-width: 0; overflow-x: auto; justify-content: safe center; scrollbar-width: none; }
+  .rail::-webkit-scrollbar { display: none; }
+}
+@media (max-width: 520px) {
+  .rail { gap: 4px; padding: 8px; }
+  .rail-btn { flex: none; width: 42px; height: 42px; }
+}

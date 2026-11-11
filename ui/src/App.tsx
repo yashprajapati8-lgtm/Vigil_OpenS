@@ -16,6 +16,7 @@ import { PhoneCheckout } from "./pages/PhoneCheckout";
 import { Phones } from "./pages/Phones";
 import { PhoneToasts } from "./components/PhoneToasts";
 import { ProvingGround } from "./pages/ProvingGround";
+import { Connect } from "./pages/Connect";
 import { Store } from "./pages/Store";
 import { useVigil, VigilProvider } from "./state/vigil";
 import { REPLAY } from "./replay/player";
@@ -60,6 +61,8 @@ function Console({ path }: { path: string }) {
     <ProvingGround />
   ) : path.startsWith("/phones") ? (
     <Phones />
+  ) : path.startsWith("/connect") ? (
+    <Connect />
   ) : path.startsWith("/incidents") ? (
     <Incidents />
   ) : (
@@ -72,7 +75,8 @@ function Console({ path }: { path: string }) {
   }, []);
   useEffect(() => {
     const name = incidentId ? incidentId : path.startsWith("/proving-ground") ? "Proving Ground"
-      : path.startsWith("/incidents") ? "Incidents" : path.startsWith("/phones") ? "Phone checkout" : "Mission";
+      : path.startsWith("/incidents") ? "Incidents" : path.startsWith("/phones") ? "Phone checkout"
+      : path.startsWith("/connect") ? "Connect your app" : "Mission";
     document.title = `VIGIL | ${name}`;
   }, [path, incidentId]);
 
