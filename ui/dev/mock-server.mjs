@@ -28,6 +28,14 @@ function point(ts) {
   };
 }
 const history = Array.from({ length: 180 }, (_, i) => point(now - (179 - i) * 5));
+if (process.env.LEARNING) {
+  // Real traffic is never flat: now and then a slow request lifts p95 for a tick.
+  history.forEach((pt, i) => {
+    if (i % 7 === 3) pt.services.payment.p95_ms *= rnd(2.4, 4.5);
+    if (i % 11 === 5) pt.services.inventory.p95_ms *= rnd(2.5, 5);
+    if (i % 5 === 1) pt.services.payment.p95_ms *= rnd(1.15, 1.35);
+  });
+}
 
 const options = [
   { action: "restart", target: "inventory", p_fix: 0.85, saves: 4999, drops: 59, score: 4940, note: "clears a stuck process", executable: true, label: "restart inventory" },

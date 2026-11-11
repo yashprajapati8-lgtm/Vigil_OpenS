@@ -4,6 +4,7 @@ import { player, REPLAY, REPO_URL } from "../replay/player";
 import { duration } from "../lib/format";
 import { LIVE_VIDEO_URL } from "../lib/links";
 import { useVigil } from "../state/vigil";
+import { LearningChart } from "./LearningChart";
 
 /** Overall learning state: slowest service decides; the countdown ticks every second
  *  between the 5 s updates so the bar never looks frozen. */
@@ -27,8 +28,18 @@ export function useLearning() {
 
 function LearningPanel() {
   const l = useLearning();
+  const { history } = useVigil();
+  const [picked, setPicked] = useState<string | null>(null);
   if (!l) return null;
   const pct = Math.round(l.progress * 100);
+  // Show the service still learning slowest, unless the person picked one.
+  const learning = l.services.filter((v) => v.state === "learning");
+  let slowest = learning[0];
+  for (const v of learning) {
+    if ((v.learning_progress ?? 0) < (slowest.learning_progress ?? 0)) slowest = v;
+  }
+  const shown = l.services.find((v) => v.service === picked) ?? slowest;
+  const shownProgress = shown.state === "learning" ? shown.learning_progress ?? 0 : 1;
   return (
     <section className="learning panel" role="status" aria-live="polite" aria-label={`VIGIL is learning normal traffic, ${pct}%`}>
       <div className="learning-icon" aria-hidden="true"><GraduationCap size={22} /></div>
@@ -37,18 +48,20 @@ function LearningPanel() {
           <h2>VIGIL is learning what normal looks like</h2>
           <span className="learning-num"><b>{pct}%</b>{l.eta != null && <span>{l.eta < 1 ? "finishing" : `about ${duration(l.eta)} left`}</span>}</span>
         </div>
-        <div className="learning-bar" aria-hidden="true"><span style={{ width: `${Math.max(2, pct)}%` }} /></div>
-        <p>
-          It watches normal traffic first, so it never judges a service against a guess. Detection starts at 100%;
-          don't inject faults until then.
-        </p>
-        <div className="learning-services">
+        <div className="learning-services" role="tablist" aria-label="Service to show">
           {l.services.map((v) => (
-            <span key={v.service} data-done={v.state !== "learning"}>
+            <button key={v.service} type="button" role="tab" aria-selected={v.service === shown.service}
+              data-done={v.state !== "learning"} onClick={() => setPicked(v.service)}>
               {v.service} {v.state === "learning" ? `${Math.round((v.learning_progress ?? 0) * 100)}%` : "ready"}
-            </span>
+            </button>
           ))}
         </div>
+        <LearningChart service={shown.service} history={history} progress={shownProgress} />
+        <p>
+          Every dot is {shown.service}'s p95 latency, 5 s apart. VIGIL takes the median, so readings near normal
+          shape the band and a far spike barely moves it. Detection starts at 100%; don't inject faults until then.
+          After that it keeps learning, from healthy readings only: a spike it flags is never learned.
+        </p>
       </div>
     </section>
   );

@@ -837,3 +837,46 @@ a { color: var(--vigil); }
   .rail { gap: 4px; padding: 8px; }
   .rail-btn { flex: none; width: 42px; height: 42px; }
 }
+
+/* ---------- learning: the normal band forming (LearningChart.tsx) ---------- */
+.learning-services { margin-top: 10px; }
+.learning-services button {
+  font: inherit; font-size: 12.5px; padding: 3px 11px; border-radius: 999px; cursor: pointer; background: transparent;
+  border: 1px solid rgba(227, 167, 62, 0.4); color: #fce9c6; transition: background var(--t-hover) var(--ease-out);
+}
+.learning-services button[data-done="true"] { border-color: var(--ok-mid); color: #d6f0e1; }
+.learning-services button[aria-selected="true"] { background: rgba(227, 167, 62, 0.16); }
+.learning-services button[data-done="true"][aria-selected="true"] { background: rgba(63, 174, 110, 0.18); }
+.learning-services button:focus-visible { outline: 2px solid var(--vigil); outline-offset: 2px; }
+
+.lc { margin: 12px 0 10px; min-width: 0; }
+.lc svg { display: block; overflow: visible; }
+/* The band glides to its new place as each reading arrives. */
+.lc-band { fill: rgba(79, 209, 197, 0.11); stroke: rgba(79, 209, 197, 0.28); stroke-width: 1; transition: y 0.8s var(--ease-out), height 0.8s var(--ease-out); }
+.lc-normal { stroke: var(--vigil); stroke-width: 1.5; stroke-dasharray: 5 4; transition: y1 0.8s var(--ease-out), y2 0.8s var(--ease-out); }
+.lc-line { fill: none; stroke: #a8998e; stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
+.lc-pt circle { fill: var(--vigil); stroke: #191513; stroke-width: 1.5; }
+.lc-pt[data-far] circle { fill: #191513; stroke: #f3b85c; stroke-width: 2; }
+.lc-pt[data-old] circle { fill: #6a605a; stroke: #191513; opacity: 0.6; }
+.lc-pt[data-old][data-far] circle { fill: #191513; stroke: #6a605a; }
+.lc-clip { fill: none; stroke: #f3b85c; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.lc-now { fill: none; stroke: var(--vigil); stroke-width: 2; opacity: 0; transform-box: fill-box; transform-origin: center; animation: vg-reading 1.1s var(--ease-out); }
+@keyframes vg-reading { 0% { opacity: 0.9; transform: scale(0.4); } 100% { opacity: 0; transform: scale(1.9); } }
+.lc-axis { fill: var(--text-2); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.lc-axis-dim { fill: var(--text-3); }
+.lc-track { stroke: var(--well); stroke-width: 4; stroke-linecap: round; }
+.lc-progress { stroke: #e3a73e; stroke-width: 4; stroke-linecap: round; transition: x2 1s linear; }
+.lc-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 8px; font-size: 12.5px; color: var(--text-3); }
+.lc-legend span { display: inline-flex; align-items: center; gap: 7px; }
+.lc-key { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+.lc-key-band { width: 18px; height: 10px; border-radius: 4px; background: rgba(79, 209, 197, 0.16); border: 1px solid rgba(79, 209, 197, 0.4); }
+.lc-key-near { background: var(--vigil); }
+.lc-key-far { border: 2px solid #f3b85c; }
+@media (prefers-reduced-motion: reduce) {
+  .lc-band, .lc-normal, .lc-progress { transition: none; }
+  .lc-now { animation: none; }
+}
+@media (max-width: 520px) {
+  .learning.panel { grid-template-columns: minmax(0, 1fr); padding: 16px; }
+  .learning-icon { display: none; }
+}
