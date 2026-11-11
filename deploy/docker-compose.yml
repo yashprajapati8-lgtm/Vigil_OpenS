@@ -1,0 +1,66 @@
+# VIGIL beside YOUR app: only VIGIL, none of the demo shop.
+#
+#   1. python scripts/vigil_init.py        writes vigil.yaml, prometheus.yml and .env here
+#   2. label your containers                (vigil_init.py prints the lines)
+#   3. docker compose up --build -d         (in this folder)
+#   4. open http://localhost:3000
+#
+# Your services keep running in their own Compose project. VIGIL reaches them two ways:
+#   - Prometheus joins your app's Docker network (APP_NETWORK) to scrape their /metrics.
+#   - The actuator talks to Docker itself, and acts only on containers you labelled
+#     vigil.managed=true, only with the fixes vigil.yaml allows.
+name: vigil-layer
+
+networks:
+  vigil: {}                 # engine, Prometheus, console
+  control: {}               # engine <-> actuator only: the one path to the Docker socket
+  app:                      # your app's network (docker network ls)
+    external: true
+    name: "${APP_NETWORK:?Set APP_NETWORK in .env to the Docker network your services are on}"
+
+services:
+  vigil-prometheus:
+    image: prom/prometheus:v2.53.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=2d
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks: [vigil, app]
+    restart: unless-stopped
+
+  vigil-engine:
+    build: ../engine
+    environment:
+      PROMETHEUS_URL: http://vigil-prometheus:9090
+      VIGIL_CONFIG: /etc/vigil/vigil.yaml
+      VIGIL_DATA_DIR: /data
+      VIGIL_ADMIN_TOKEN: ${VIGIL_ADMIN_TOKEN:?Set VIGIL_ADMIN_TOKEN in .env}
+      VIGIL_AUTONOMY: ${VIGIL_AUTONOMY:-}          # empty: vigil.yaml decides
+      VIGIL_ADAPT: ${VIGIL_ADAPT:-1}
+      ACTUATOR_URL: http://vigil-actuator:8000
+      ACTUATOR_TOKEN: ${VIGIL_ADMIN_TOKEN:?Set VIGIL_ADMIN_TOKEN in .env}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}              # optional second opinion; without it, confidence is capped at Medium
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-120b}
+    volumes:
+      - ./data:/data                               # incidents database + learned baselines
+      - ./vigil.yaml:/etc/vigil/vigil.yaml:ro
+    networks: [vigil, control]                     # the console's nginx proxies to "vigil-engine"
+    depends_on: [vigil-prometheus, vigil-actuator]
+    restart: unless-stopped
+
+  vigil-actuator:
+    build: ../actuator
+    environment:
+      ACTUATOR_TOKEN: ${VIGIL_ADMIN_TOKEN:?Set VIGIL_ADMIN_TOKEN in .env}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock  # only this container touches Docker
+    networks: [control]                            # no published port
+    restart: unless-stopped
+
+  vigil-ui:
+    build: ../ui
+    networks: [vigil]
+    ports: ["${VIGIL_PORT:-3000}:80"]
+    depends_on: [vigil-engine]
+    restart: unless-stopped

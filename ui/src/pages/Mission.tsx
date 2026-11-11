@@ -8,6 +8,7 @@ import { LoadError, MissionSkeleton } from "../components/Skeletons";
 import { StartHere } from "../components/StartHere";
 import { REPLAY } from "../replay/player";
 import { useVigil } from "../state/vigil";
+import { useSite } from "../lib/site";
 
 // Top: the service map, full width, so every card says what is happening to it.
 // Under it the signals beside how far VIGIL has got (the loop); the reasoning
@@ -15,14 +16,16 @@ import { useVigil } from "../state/vigil";
 export function Mission({ onOpenChaos }: { onOpenChaos: () => void }) {
   const { focus, events, verdicts, health, loaded, error, refresh } = useVigil();
   const learning = useLearning();
+  const site = useSite();
   if (!loaded) return error ? <LoadError message={error} onRetry={refresh} /> : <MissionSkeleton />;
   return (
     <>
       {REPLAY ? (
         <StartHere replay onOpenChaos={onOpenChaos} />
-      ) : (
+      ) : site.demo ? (
+        // The guided demo (break something in the Chaos Lab) exists only for the demo shop.
         <StartHere onOpenChaos={onOpenChaos} busy={focus ? "incident" : learning ? "learning" : null} />
-      )}
+      ) : null}
       <div className="mission">
         <div className="mission-main">
           <ServiceMap />

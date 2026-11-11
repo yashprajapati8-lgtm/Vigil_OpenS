@@ -15,3 +15,12 @@ data/*/*
 .DS_Store
 
 .env
+
+# deploy/: written for YOUR site by scripts/vigil_init.py, never committed
+deploy/vigil.yaml
+deploy/prometheus.yml
+deploy/data/
+
+# Python packaging leftovers (pip install ./instrument/python)
+build/
+*.egg-info/

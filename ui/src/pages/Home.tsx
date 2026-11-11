@@ -266,7 +266,7 @@ export function Home() {
         <section className="home-section built" aria-labelledby="built-title">
           <h2 id="built-title">Built with</h2>
           <ul className="tech-stack">
-            <li><b>Engine</b> Python, FastAPI, scikit-learn IsolationForest, 163 tests</li>
+            <li><b>Engine</b> Python, FastAPI, scikit-learn IsolationForest, 169 tests</li>
             <li><b>Telemetry</b> Prometheus golden signals</li>
             <li><b>Second opinion</b> Groq, gpt-oss-120b</li>
             <li><b>Console</b> React, TypeScript, Vite, live server-sent events</li>

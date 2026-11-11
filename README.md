@@ -351,6 +351,21 @@ Only High confidence will let VIGIL act alone (step 4). Check your Groq key work
 docker compose exec vigil-engine python -m vigil.llm_check
 ```
 
+## Add VIGIL to your own app
+
+**[docs/ADD_TO_YOUR_APP.md](docs/ADD_TO_YOUR_APP.md)**, about 20 minutes:
+
+1. `pip install ./instrument/python`, then two lines in each FastAPI service
+   ([`instrument/README.md`](instrument/README.md)).
+2. `python scripts/vigil_init.py` asks about your site and writes `deploy/vigil.yaml`,
+   `deploy/prometheus.yml` and `deploy/.env`.
+3. Label the containers VIGIL may act on.
+4. `cd deploy && docker compose up --build -d`: only VIGIL (engine, actuator, console,
+   Prometheus), beside your services, none of the demo.
+
+FastAPI only for now (Node is next). VIGIL fixes what runs in Docker on the same machine;
+anywhere else it watches, diagnoses and tells a human.
+
 ## Describe your site: `vigil.yaml`
 
 One file tells VIGIL what it is watching. The shipped [`vigil.yaml`](vigil.yaml) describes
@@ -401,7 +416,7 @@ pip install -r requirements-dev.txt
 pytest -q
 ```
 
-163 tests, including the adaptive baseline (traffic tripling over 6 h opens nothing; a slow latency creep is held and reported as drift), `vigil.yaml` validation and allowed-fix rules, the leak fixed before the crash, the flash-sale scale-out and scale-in, "real demand is never answered with a restart", the bad-deploy rollback (old version up before the bad one stops; restart never wakes a stopped version), the busy-laptop false alarm (now filtered), the operator lock, the full decide-act-verify loop, approvals, the kill switch, a fault
+169 tests, including the adaptive baseline (traffic tripling over 6 h opens nothing; a slow latency creep is held and reported as drift), `vigil.yaml` validation and allowed-fix rules, the leak fixed before the crash, the flash-sale scale-out and scale-in, "real demand is never answered with a restart", the bad-deploy rollback (old version up before the bad one stops; restart never wakes a stopped version), the busy-laptop false alarm (now filtered), the operator lock, the full decide-act-verify loop, approvals, the kill switch, a fault
 that survives a restart (escalates, no loop), actuator refusals and the policy math. Also 40 simulated clean half-hours with zero false incidents, detection in
 exactly 3 ticks, leak prediction before the crash, telemetry outages, restart mid-incident,
 the blame walk, every category rule, LLM hallucination/outage/retry handling, and the
@@ -410,8 +425,11 @@ confidence matrix.
 ## Layout
 
 ```
-vigil.yaml     your site: services, calls, what customers do, allowed fixes, autonomy
-examples/      vigil.yaml for other sites (results portal)
+vigil.yaml     the demo's site: services, calls, what customers do, allowed fixes, autonomy
+examples/      other sites: results-portal.yaml + a 4-service FastAPI portal (results-portal/app.py)
+instrument/    vigil-instrument: two lines make a FastAPI service report what VIGIL needs
+deploy/        VIGIL only, beside your app (docker compose); scripts/vigil_init.py fills it in
+docs/          ADD_TO_YOUR_APP.md
 ui/            command center + demo shop (React, built into an nginx image that proxies every backend)
 proving_ground/ test harness: injects every fault, scores VIGIL, writes the scorecard (not part of VIGIL)
 scripts/       deploy.ps1: blue/green payment deploys

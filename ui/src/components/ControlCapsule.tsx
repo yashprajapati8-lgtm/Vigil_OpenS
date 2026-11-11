@@ -64,6 +64,7 @@ export function ControlCapsule({ unlocked, runAsOperator, onLock, onLocked }: Pr
   const status = useStatus();
   const [error, setError] = useState<string | null>(null);
   const control = health?.control;
+  const demo = useSite().demo;      // the guide walks through the demo shop only
 
   const send = (body: Partial<Control>) =>
     runAsOperator(async () => {
@@ -112,10 +113,12 @@ export function ControlCapsule({ unlocked, runAsOperator, onLock, onLocked }: Pr
         <span className="switch-knob">{control?.paused ? <Pause size={18} /> : <Play size={18} />}</span>
         Actions {control?.paused ? "paused" : "armed"}
       </button>
-      <button type="button" className="icon-btn" aria-label="Show the guide: how to see VIGIL work" title="How to see VIGIL work"
-        onClick={() => { navigate("/console"); showGuide(); }}>
-        <CircleHelp size={18} />
-      </button>
+      {demo && (
+        <button type="button" className="icon-btn" aria-label="Show the guide: how to see VIGIL work" title="How to see VIGIL work"
+          onClick={() => { navigate("/console"); showGuide(); }}>
+          <CircleHelp size={18} />
+        </button>
+      )}
       <button type="button" className="icon-btn" data-unlocked={unlocked || REPLAY}
         aria-label={REPLAY ? "Operator controls: no token needed in this replay" : unlocked ? "Operator controls unlocked. Lock them" : "Unlock operator controls"}
         title={REPLAY ? "Operator controls: open in this replay" : unlocked ? "Operator mode: lock" : "Operator mode: unlock"}
