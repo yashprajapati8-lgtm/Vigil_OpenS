@@ -154,17 +154,36 @@ recorded, and the hosted replay plays these five faults exactly as they happened
   services. The blame walk only visits services on a failing path.
 - These are next steps, not built yet. What is built is tested end to end by the Proving Ground.
 
-## Run it (Windows, Docker Desktop)
+## Run it (Docker Desktop: Windows, macOS or Linux)
 
-In PowerShell:
+**No install? Watch it instead:** the [hosted replay](https://vigil-open-s.vercel.app) plays real
+recorded runs in your browser, and the [4-minute demo](https://youtu.be/qtrbB_tZ86c) shows the live stack.
+
+**You need:** [Docker Desktop](https://www.docker.com/products/docker-desktop/) running, Git, and about
+4 GB of free RAM. Optional: a free [Groq API key](https://console.groq.com/keys) for the LLM second opinion.
+Without it VIGIL still finds the cause and fixes, but its confidence stays Medium, so at the default
+autonomy (L2) it asks you to approve each fix in the console.
+
+In PowerShell (on macOS or Linux use `cp` instead of `copy`):
 
 ```powershell
 git clone https://github.com/yashprajapati8-lgtm/Vigil_OpenS.git
 cd Vigil_OpenS
-copy .env.example .env      # then edit .env: set CHAOS_TOKEN and VIGIL_ADMIN_TOKEN
+copy .env.example .env      # then edit .env: set CHAOS_TOKEN and VIGIL_ADMIN_TOKEN (any long random strings), and GROQ_API_KEY if you have one
 docker compose up --build -d
+docker compose --profile replica create payment-replica   # the spare payment instance VIGIL starts in a flash sale
 docker compose ps           # every container should be "running" (services: "healthy")
 ```
+
+**Your first demo (about 5 minutes):**
+1. Open **http://localhost:3000/console**. VIGIL learns what normal looks like for about 3 minutes; the learning chart shows it.
+2. When it reaches 100%, open the **Chaos Lab** (flask icon), hold **Slow inventory**, and watch the service map and *What VIGIL is doing*: it finds inventory, restarts it and checks that checkouts recover.
+3. Then try **Flash sale**: VIGIL adds a payment replica instead of restarting.
+4. Between faults, hold **Fresh start** in the Chaos Lab (it asks for your `VIGIL_ADMIN_TOKEN`). It clears every fault, closes open incidents and relearns normal.
+
+**If VIGIL hands a fault to a human** (an "escalated" incident, or a "needs you" email): it found a cause it may
+not fix alone. The incident page shows what it found and recommends. To start clean, hold **Fresh start**. If
+the map shows services *down* with 0 checkouts/s, part of the stack isn't running: run `docker compose up -d`.
 
 | Open | What you should see |
 | --- | --- |
