@@ -151,6 +151,17 @@ if (process.env.SITE === "results") {
   state.health = health;
   if (incident) Object.assign(incident, remap(incident));
 }
+let alertTo = [];
+const rid = (a) => Buffer.from(a.toLowerCase()).toString("hex").slice(0, 10);
+const maskA = (a) => { const [n, d] = a.split("@"); return `${n.slice(0, 1)}***@${d}`; };
+function alertsStatus() {
+  if (process.env.MAIL === "off") return { email: "off", sender: false, recipients: [], why: "VIGIL has no account to send from" };
+  const recipients = alertTo.map((a) => ({ id: rid(a), masked: maskA(a), source: "console" }));
+  return recipients.length
+    ? { email: "on", sender: true, recipients, to: recipients.map((r) => r.masked), from: "y***@gmail.com", sent: 0, last_error: null }
+    : { email: "off", sender: true, recipients, why: "add an email address to send alerts to" };
+}
+health.alerts = alertsStatus();
 const send = (res, code, body) => { res.writeHead(code, { "Content-Type": "application/json" }); res.end(JSON.stringify(body)); };
 http.createServer((req, res) => {
   if (process.env.DELAY && req.url.startsWith("/api/state")) {   // dev: preview loading skeletons
@@ -165,6 +176,27 @@ http.createServer((req, res) => {
   if (p === "/api/incidents") return send(res, 200, { incidents: incident ? [incident] : [] });
   if (p.startsWith("/api/incidents/")) return incident ? send(res, 200, { incident, events: events.filter((e) => e.incident_id === "VGL-0002") }) : send(res, 404, { detail: "no such incident" });
   if (p === "/api/baseline/accept") return req.headers["x-vigil-token"] === "demo" ? send(res, 200, { service: u.searchParams.get("service"), accepted: ["p95_ms"] }) : send(res, 403, { detail: "admin token required" });
+  // Email alerts, like notify.py: a sender from .env (MAIL=off: none), recipients added here.
+  if (p === "/api/alerts/recipients" || p === "/api/alerts/recipients/remove" || p === "/api/alerts/test") {
+    if (req.headers["x-vigil-token"] !== "demo") return send(res, 403, { detail: "admin token required" });
+    let body = "";
+    req.on("data", (c) => { body += c; });
+    req.on("end", () => {
+      const j = body ? JSON.parse(body) : {};
+      if (p === "/api/alerts/recipients") {
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(j.email || "")) return send(res, 400, { detail: "that doesn't look like an email address" });
+        if (alertTo.some((a) => a.toLowerCase() === j.email.toLowerCase())) return send(res, 400, { detail: "that address already gets alerts" });
+        alertTo.push(j.email);
+      } else if (p.endsWith("/remove")) {
+        alertTo = alertTo.filter((a) => rid(a) !== j.id);
+      } else if (!alertTo.length) {
+        return send(res, 502, { detail: "test email failed: RuntimeError: no one to send to: add an email address first" });
+      }
+      health.alerts = alertsStatus();
+      send(res, 200, { sent: true, ...health.alerts });
+    });
+    return;
+  }
   // Like the real engine: no token, no fresh start.
   if (p === "/api/fresh-start") return req.headers["x-vigil-token"] === "demo" ? send(res, 200, { closed: [], relearning: ["payment", "inventory"] }) : send(res, 403, { detail: "admin token required" });
   if (p === "/chaos/reset" || p === "/reset") return send(res, 200, { errors: {} });

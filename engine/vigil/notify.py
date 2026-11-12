@@ -15,16 +15,21 @@ Each one goes at most once per incident (or per service, for drift), at most
 alert_max_per_hour in total. A spike VIGIL is still confirming, a surge it
 handles, every small event: no email, or people learn to ignore them.
 
-Off unless VIGIL_SMTP_HOST and VIGIL_ALERT_TO are set. Emails are built and sent
+Off until VIGIL has an account to send from (VIGIL_SMTP_* in .env) and someone
+to send to (VIGIL_ALERT_TO in .env, or added in the console by an operator). Emails are built and sent
 on one background thread with a timeout: a slow mail server never slows VIGIL.
 The SMTP password is never logged.
 """
 
 from __future__ import annotations
 
+import hashlib
 import html
+import json
 import logging
+import os
 import queue
+import re
 import smtplib
 import ssl
 import threading
@@ -37,6 +42,18 @@ from .incidents import fmt_duration
 from .store import Store
 
 log = logging.getLogger("vigil.notify")
+
+EMAIL_RE = re.compile(r"^[^@\s,;<>\"']+@[^@\s,;<>\"']+\.[^@\s,;<>\"']{2,}$")
+MAX_RECIPIENTS = 10
+
+
+class RecipientError(ValueError):
+    """An address the console can't add or remove; the message says why, in plain words."""
+
+
+def recipient_id(address: str) -> str:
+    """A short, stable id the console uses to remove an address it only shows masked."""
+    return hashlib.sha256(address.strip().lower().encode()).hexdigest()[:10]
 
 ACTION_TEXT = {"restart": "restart {t}", "rollback": "roll back {t}", "scale_out": "add a {t} replica", "wait": "wait"}
 
@@ -116,7 +133,10 @@ class Notifier:
     def __init__(self, settings: Settings, store: Store):
         self.s = settings
         self.store = store
-        self.enabled = bool(settings.smtp_host and settings.alert_to)
+        # Who receives alerts: VIGIL_ALERT_TO from .env, plus addresses added in the
+        # console (operator only), saved in the data folder so they survive a restart.
+        self._path = settings.data_dir / "alert_recipients.json"
+        self._saved: list[str] = self._load()
         self.sent = 0
         self.last_error: str | None = None
         self.last_sent_at: float | None = None
@@ -126,12 +146,87 @@ class Notifier:
         self._worker: threading.Thread | None = None
         self._lock = threading.Lock()
 
+    # ---- who receives alerts
+
+    def _load(self) -> list[str]:
+        try:
+            data = json.loads(self._path.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            return []
+        except (OSError, ValueError) as exc:
+            log.warning("ignoring unreadable %s: %s", self._path.name, exc)
+            return []
+        out = []
+        for a in data.get("recipients", []) if isinstance(data, dict) else []:
+            if isinstance(a, str) and EMAIL_RE.match(a):
+                out.append(a)
+        return out
+
+    def _save(self) -> None:
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self._path.with_suffix(".tmp")
+        tmp.write_text(json.dumps({"recipients": self._saved}, indent=1), encoding="utf-8")
+        os.replace(tmp, self._path)        # all or nothing: a crash never leaves half a file
+
+    @property
+    def recipients(self) -> list[str]:
+        out: list[str] = []
+        seen: set[str] = set()
+        for a in [*self.s.alert_to, *self._saved]:
+            if a.lower() not in seen:
+                seen.add(a.lower())
+                out.append(a)
+        return out
+
+    @property
+    def sender_ready(self) -> bool:
+        return bool(self.s.smtp_host)
+
+    @property
+    def enabled(self) -> bool:
+        return self.sender_ready and bool(self.recipients)
+
+    def add_recipient(self, address: str) -> None:
+        address = (address or "").strip()
+        if len(address) > 254 or not EMAIL_RE.match(address):
+            raise RecipientError("that doesn't look like an email address")
+        with self._lock:
+            if address.lower() in {a.lower() for a in self.recipients}:
+                raise RecipientError("that address already gets alerts")
+            if len(self.recipients) >= MAX_RECIPIENTS:
+                raise RecipientError(f"at most {MAX_RECIPIENTS} addresses")
+            self._saved.append(address)
+            self._save()
+        log.info("alert recipient added: %s", mask(address))
+
+    def remove_recipient(self, rid: str) -> None:
+        with self._lock:
+            for a in self.s.alert_to:
+                if recipient_id(a) == rid:
+                    raise RecipientError("that address is set in .env (VIGIL_ALERT_TO): remove it there")
+            for a in self._saved:
+                if recipient_id(a) == rid:
+                    self._saved.remove(a)
+                    self._save()
+                    log.info("alert recipient removed: %s", mask(a))
+                    return
+        raise RecipientError("no such address")
+
     # ---- what the engine sees
 
     def status(self) -> dict:
-        if not self.enabled:
-            return {"email": "off", "why": "set VIGIL_SMTP_HOST and VIGIL_ALERT_TO in .env to turn it on"}
-        return {"email": "on", "to": [mask(a) for a in self.s.alert_to], "on": list(self.s.alert_on),
+        env = {a.lower() for a in self.s.alert_to}
+        view = [{"id": recipient_id(a), "masked": mask(a), "source": ".env" if a.lower() in env else "console"}
+                for a in self.recipients]
+        base = {"sender": self.sender_ready, "recipients": view}
+        if not self.sender_ready:
+            return {**base, "email": "off",
+                    "why": "VIGIL has no account to send from: set VIGIL_SMTP_HOST, VIGIL_SMTP_USER and "
+                           "VIGIL_SMTP_PASSWORD in .env"}
+        if not view:
+            return {**base, "email": "off", "why": "add an email address to send alerts to"}
+        return {**base, "email": "on", "from": mask(self.s.alert_from or self.s.smtp_user),
+                "to": [r["masked"] for r in view], "on": list(self.s.alert_on),
                 "sent": self.sent, "last_sent_at": self.last_sent_at, "last_error": self.last_error}
 
     def on_message(self, message: dict) -> None:
@@ -165,8 +260,10 @@ class Notifier:
 
     def send_test(self) -> None:
         """Send one email now (POST /api/alerts/test). Raises on failure, with the reason."""
-        if not self.enabled:
+        if not self.sender_ready:
             raise RuntimeError("email alerts are off: set VIGIL_SMTP_HOST and VIGIL_ALERT_TO in .env")
+        if not self.recipients:
+            raise RuntimeError("no one to send to: add an email address first")
         mail = Email(
             subject=f"[VIGIL] {self.s.site_name}: test email",
             headline="Email alerts work.",
@@ -275,7 +372,7 @@ class Notifier:
         msg = EmailMessage()
         msg["Subject"] = mail.subject
         msg["From"] = self.s.alert_from or self.s.smtp_user
-        msg["To"] = ", ".join(self.s.alert_to)
+        msg["To"] = ", ".join(self.recipients)
         msg["Date"] = formatdate(localtime=True)
         msg["Message-ID"] = make_msgid(domain="vigil.local")
         msg.set_content(mail.text())

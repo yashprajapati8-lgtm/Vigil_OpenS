@@ -19,6 +19,7 @@ from .config import SETTINGS
 from .engine import Engine
 from .policy import AUTONOMY
 from .store import Store
+from .notify import RecipientError
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -164,6 +165,36 @@ def reset_baseline(service: str | None = None, x_vigil_token: str | None = Heade
     return {"relearning": targets}
 
 
+class Recipient(BaseModel):
+    email: str
+
+
+class RecipientRef(BaseModel):
+    id: str
+
+
+@app.post("/api/alerts/recipients")
+def add_recipient(body: Recipient, x_vigil_token: str | None = Header(None)):
+    """Add an address that gets VIGIL's email alerts. Operator only: otherwise anyone
+    who can open the console could add theirs, or remove yours."""
+    require_admin(x_vigil_token)
+    try:
+        _engine().notifier.add_recipient(body.email)
+    except RecipientError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return _engine().notifier.status()
+
+
+@app.post("/api/alerts/recipients/remove")
+def remove_recipient(body: RecipientRef, x_vigil_token: str | None = Header(None)):
+    require_admin(x_vigil_token)
+    try:
+        _engine().notifier.remove_recipient(body.id)
+    except RecipientError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return _engine().notifier.status()
+
+
 @app.post("/api/alerts/test")
 def test_alert(x_vigil_token: str | None = Header(None)):
     """Send one test email now, to check the SMTP settings in .env before you need them."""
@@ -173,7 +204,7 @@ def test_alert(x_vigil_token: str | None = Header(None)):
     except Exception as exc:
         # The reason (wrong password, blocked port) is what the operator needs; never the password.
         raise HTTPException(status_code=502, detail=f"test email failed: {type(exc).__name__}: {exc}")
-    return {"sent": True, "to": _engine().notifier.status().get("to")}
+    return {"sent": True, **_engine().notifier.status()}
 
 
 @app.post("/api/baseline/accept")

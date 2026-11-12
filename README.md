@@ -175,17 +175,20 @@ Stop everything: `docker compose down`.
 
 ## Email alerts (optional)
 
-Add to `.env`, then `docker compose up -d vigil-engine`:
+VIGIL needs an account to **send from**, set once in `.env`, then `docker compose up -d vigil-engine`:
 
 ```env
 VIGIL_SMTP_HOST=smtp.gmail.com
 VIGIL_SMTP_USER=you@gmail.com
 VIGIL_SMTP_PASSWORD=<a Gmail app password: myaccount.google.com/apppasswords>
-VIGIL_ALERT_TO=you@gmail.com
-VIGIL_CONSOLE_URL=http://<this laptop's Wi-Fi IP>:3000   # so the link opens on your phone
+VIGIL_CONSOLE_URL=http://<this laptop's Wi-Fi IP>:3000   # optional: so the link opens on your phone
 ```
 
-Check it before you need it (operator token required):
+**Who receives** the alerts is managed in the console: the mail icon in the top bar opens the
+*Email alerts* card (Connect tab). Unlock operator mode, add an address, press *Send a test email*.
+Addresses are saved in the data folder and survive restarts. (`VIGIL_ALERT_TO` in `.env` works too.)
+
+Or from PowerShell (operator token required):
 
 ```powershell
 $t = ((Get-Content .env | Select-String '^VIGIL_ADMIN_TOKEN=').Line -split '=',2)[1]

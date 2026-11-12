@@ -28,6 +28,9 @@ def test_no_configured_token_locks_every_action(monkeypatch):
     assert c.post("/api/operator/check", headers={"X-Vigil-Token": ""}).status_code == 403
     assert c.post("/api/control", json={"paused": True}).status_code == 403
     assert c.post("/api/incidents/VGL-0001/approve").status_code == 403
+    assert c.post("/api/alerts/recipients", json={"email": "x@y.com"}).status_code == 403
+    assert c.post("/api/alerts/recipients/remove", json={"id": "abc"}).status_code == 403
+    assert c.post("/api/alerts/test").status_code == 403
 
 
 def test_actions_check_the_token_before_touching_the_engine(monkeypatch):

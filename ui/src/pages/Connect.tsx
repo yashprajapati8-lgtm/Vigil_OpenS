@@ -2,6 +2,7 @@ import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 import { useSite } from "../lib/site";
 import { useVigil } from "../state/vigil";
+import { EmailAlerts } from "../components/EmailAlerts";
 
 // Connect your app: how to put VIGIL beside your own site, step by step, with the
 // exact code and files. It only shows and copies; nothing here changes anything.
@@ -185,14 +186,6 @@ function WatchingNow() {
         })}
       </ul>
       {autonomy && <p className="cx-now-line">Autonomy <b>{autonomy}</b>{config ? <> · <code className="cx-inline">{config}</code></> : null}</p>}
-      {health?.alerts && (
-        <p className="cx-now-line cx-now-alerts">
-          Email alerts{" "}
-          {health.alerts.email === "on"
-            ? <><b>on</b>, to {health.alerts.to?.join(", ")}{health.alerts.last_error ? <span className="cx-now-err"> · last send failed</span> : null}</>
-            : <><b>off</b>: set them in .env</>}
-        </p>
-      )}
     </section>
   );
 }
@@ -275,6 +268,7 @@ export function Connect() {
 
       <aside className="cx-side">
         <WatchingNow />
+        <EmailAlerts />
         <section className="panel" aria-labelledby="cx-ready-title">
           <div className="panel-head"><h2 id="cx-ready-title">Works with</h2></div>
           <ul className="cx-ready">

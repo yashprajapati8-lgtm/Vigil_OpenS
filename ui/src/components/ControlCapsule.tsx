@@ -1,4 +1,4 @@
-import { CircleHelp, Lock, LockOpen, Pause, Play } from "lucide-react";
+import { CircleHelp, Lock, LockOpen, Mail, Pause, Play } from "lucide-react";
 import { useState } from "react";
 import { api, ApiError, setToken } from "../api/client";
 import type { Control } from "../api/types";
@@ -113,6 +113,14 @@ export function ControlCapsule({ unlocked, runAsOperator, onLock, onLocked }: Pr
         <span className="switch-knob">{control?.paused ? <Pause size={18} /> : <Play size={18} />}</span>
         Actions {control?.paused ? "paused" : "armed"}
       </button>
+      {health?.alerts && !REPLAY && (
+        <button type="button" className="icon-btn" data-on={health.alerts.email === "on" || undefined}
+          aria-label={`Email alerts: ${health.alerts.email}. Choose who gets them`}
+          title={health.alerts.email === "on" ? `Email alerts on: ${health.alerts.to?.join(", ")}` : "Email alerts are off: set them up"}
+          onClick={() => { navigate("/connect"); window.setTimeout(() => document.getElementById("email-alerts")?.scrollIntoView({ behavior: "smooth", block: "start" }), 120); }}>
+          <Mail size={18} />
+        </button>
+      )}
       {demo && (
         <button type="button" className="icon-btn" aria-label="Show the guide: how to see VIGIL work" title="How to see VIGIL work"
           onClick={() => { navigate("/console"); showGuide(); }}>

@@ -207,3 +207,70 @@ def test_site_words_reach_the_email(tmp_path):
     n = notify.Notifier(s, Store(s.db_path))
     n.send_test()
     assert FakeSMTP.sent[-1]["Subject"] == "[VIGIL] University results portal: test email"
+
+
+# ---- recipients added in the console
+
+SENDER = {k: v for k, v in MAIL.items() if k != "alert_to"}      # an account to send from, nobody to send to
+
+
+def test_sender_without_recipient_says_what_is_missing(tmp_path):
+    s = Settings(data_dir=tmp_path, **SENDER)
+    n = notify.Notifier(s, Store(s.db_path))
+    st = n.status()
+    assert (st["email"], st["sender"], st["recipients"]) == ("off", True, [])
+    assert "add an email address" in st["why"]
+    with pytest.raises(RuntimeError, match="no one to send to"):
+        n.send_test()
+    st = notify.Notifier(Settings(data_dir=tmp_path / "x"), Store(Settings(data_dir=tmp_path / "x").db_path)).status()
+    assert st["sender"] is False and "VIGIL_SMTP_USER" in st["why"]
+
+
+def test_console_recipients_get_alerts_and_survive_a_restart(tmp_path):
+    s = Settings(data_dir=tmp_path, **SENDER)
+    n = notify.Notifier(s, Store(s.db_path))
+    n.add_recipient("  judge@college.edu ")
+    n.add_recipient("me@gmail.com")
+    assert n.enabled and n.status()["to"] == ["j***@college.edu", "m***@gmail.com"]
+    n.send_test()
+    assert FakeSMTP.sent[-1]["To"] == "judge@college.edu, me@gmail.com"
+    again = notify.Notifier(s, Store(s.db_path))                  # VIGIL restarted
+    assert again.recipients == ["judge@college.edu", "me@gmail.com"]
+    again.remove_recipient(notify.recipient_id("judge@college.edu"))
+    assert notify.Notifier(s, Store(s.db_path)).recipients == ["me@gmail.com"]
+
+
+@pytest.mark.parametrize("bad, why", [
+    ("not-an-email", "doesn't look like an email"),
+    ("a@b", "doesn't look like an email"),
+    ("x@y.com, z@w.com", "doesn't look like an email"),       # one address at a time: no header tricks
+    ("me@gmail.com", "already gets alerts"),
+    ("ME@gmail.com", "already gets alerts"),
+])
+def test_bad_or_duplicate_addresses_are_refused(tmp_path, bad, why):
+    s = Settings(data_dir=tmp_path, **SENDER)
+    n = notify.Notifier(s, Store(s.db_path))
+    n.add_recipient("me@gmail.com")
+    with pytest.raises(notify.RecipientError, match=why):
+        n.add_recipient(bad)
+
+
+def test_at_most_ten_and_env_addresses_stay(tmp_path):
+    s = Settings(data_dir=tmp_path, **MAIL)                       # oncall@test.dev comes from .env
+    n = notify.Notifier(s, Store(s.db_path))
+    for i in range(9):
+        n.add_recipient(f"p{i}@test.dev")
+    with pytest.raises(notify.RecipientError, match="at most 10"):
+        n.add_recipient("one-too-many@test.dev")
+    with pytest.raises(notify.RecipientError, match="set in .env"):
+        n.remove_recipient(notify.recipient_id("oncall@test.dev"))
+    assert n.status()["recipients"][0] == {"id": notify.recipient_id("oncall@test.dev"),
+                                            "masked": "o***@test.dev", "source": ".env"}
+    with pytest.raises(notify.RecipientError, match="no such address"):
+        n.remove_recipient("nope")
+
+
+def test_a_damaged_recipients_file_never_stops_vigil(tmp_path):
+    (tmp_path / "alert_recipients.json").write_text("{not json")
+    s = Settings(data_dir=tmp_path, **SENDER)
+    assert notify.Notifier(s, Store(s.db_path)).recipients == []
