@@ -3,11 +3,11 @@
 **Watches every service. Fixes the real cause.**
 
 > ## ▶️ MUST WATCH FOR BETTER UNDERSTANDING
-> **Live demo (3 min):** VIGIL running for real on my laptop: it finds the real cause, fixes it on its own, and a phone payment fails and then succeeds again.
+> **Demo (4 min):** why downtime costs so much, how VIGIL compares with today's tools, then VIGIL fixing a stuck service and a flash sale on its own, emailing a phone as it works, and how any FastAPI app adds it.
 >
-> **https://youtu.be/5g_4jCZjP8M**
+> **https://youtu.be/qtrbB_tZ86c**
 >
-> [![VIGIL live demo: must watch](https://img.youtube.com/vi/5g_4jCZjP8M/maxresdefault.jpg)](https://youtu.be/5g_4jCZjP8M)
+> [![VIGIL demo: must watch](https://img.youtube.com/vi/qtrbB_tZ86c/maxresdefault.jpg)](https://youtu.be/qtrbB_tZ86c)
 
 VIGIL is an autonomous resilience engine for microservices. It notices when customers start
 failing, works out which service is actually broken (not just the loudest one), applies the
@@ -15,8 +15,8 @@ right fix inside strict guardrails, and only calls it done when real checkouts r
 
 | | |
 | --- | --- |
-| **▶️ MUST WATCH: live demo (3 min)** | **https://youtu.be/5g_4jCZjP8M** |
-| **Full walkthrough (5 min, voiced)** | **https://youtu.be/AQKw7XUuKtk** |
+| **▶️ MUST WATCH: demo (4 min)** | **https://youtu.be/qtrbB_tZ86c** |
+| **Earlier prototype videos (Oct 2026)** | [live demo, 3 min](https://youtu.be/5g_4jCZjP8M) · [walkthrough, 5 min](https://youtu.be/AQKw7XUuKtk) |
 | **Try it in your browser** (a real recorded run, nothing to install) | **https://vigil-six-blue.vercel.app** |
 | **Proving Ground scorecard** | **6/6 passed** on this round's code (11 Nov 2026), 5 real faults and a quiet period: median detection 20.6 s, median verified recovery 1m 18s, 0 false alarms |
 
@@ -62,9 +62,11 @@ changes (PHP and others), Node, databases, Kubernetes. VIGIL fixes only what run
 same machine; anywhere else it can watch and diagnose.
 
 **Disclosures.**
-- *Pre-existing work:* VIGIL started as my prototype in October 2026. The videos linked above
-  show that version; the hosted replay plays the 11 Nov 2026 Proving Ground run on this round's
-  code. Everything listed under *New in this round* was built for this round.
+- *Pre-existing work:* VIGIL started as my prototype in October 2026. The two earlier prototype
+  videos show that version. The 4-minute demo shows this round's code (the 11 Nov 2026 recorded
+  runs, the learning chart, the email alerts and the Connect tab); its phone-checkout clip and
+  checkout screenshots were filmed on the October prototype. The hosted replay plays the
+  11 Nov 2026 Proving Ground run. Everything listed under *New in this round* was built for this round.
 - *AI assistance:* I built this with an AI coding assistant (Anthropic's Claude) for code,
   tests and documentation. I directed the design and reviewed, ran and tested the results.
 - *Third-party:* Prometheus, FastAPI, scikit-learn, React and the other open-source libraries

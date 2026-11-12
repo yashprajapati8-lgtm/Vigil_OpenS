@@ -1,6 +1,7 @@
 import { ApiError } from "../api/errors";
 import type { Control, Health, Incident, Point, StateResponse, StreamMessage, VigilEvent } from "../api/types";
 import { duration, num } from "../lib/format";
+import { GITHUB_URL } from "../lib/links";
 
 // Replay mode (`vite build --mode replay`): the hosted link plays back real runs
 // recorded by the Proving Ground on the team's laptop. Every number on screen comes
@@ -16,7 +17,7 @@ import { duration, num } from "../lib/format";
 // measured when it decided.
 
 export const REPLAY = import.meta.env.MODE === "replay";
-export const REPO_URL: string = import.meta.env.VITE_REPO_URL ?? "";
+export const REPO_URL: string = import.meta.env.VITE_REPO_URL || GITHUB_URL;
 
 // Same tables as engine/vigil/policy.py.
 const RISK: Record<string, string> = { restart: "low", rollback: "medium", scale_out: "low" };

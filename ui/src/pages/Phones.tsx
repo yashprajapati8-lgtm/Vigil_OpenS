@@ -110,7 +110,7 @@ export function Phones() {
             payment fails, then you watch VIGIL fix it and your next payment goes through. No real money moves.
           </p>
           <div className="phones-actions">
-            <a className="btn btn-primary" href={LIVE_VIDEO_URL} target="_blank" rel="noreferrer"><Play size={16} /> Watch a phone pay live (3 min)</a>
+            <a className="btn btn-primary" href={LIVE_VIDEO_URL} target="_blank" rel="noreferrer"><Play size={16} /> Watch a phone pay in the demo (4 min)</a>
             <a className="btn" href={PHONE_README_URL} target="_blank" rel="noreferrer"><FolderGit2 size={16} /> Run it yourself from GitHub</a>
           </div>
         </section>

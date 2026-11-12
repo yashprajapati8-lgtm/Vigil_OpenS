@@ -157,7 +157,7 @@ export function Home() {
             </p>
             <div className="hero-ctas">
               <Link href="/console" className="btn btn-primary btn-lg"><MonitorPlay size={18} /> Open the console</Link>
-              <a className="btn btn-lg" href={LIVE_VIDEO_URL} target="_blank" rel="noreferrer"><Play size={18} /> Watch it live (3 min)</a>
+              <a className="btn btn-lg" href={LIVE_VIDEO_URL} target="_blank" rel="noreferrer"><Play size={18} /> Watch the demo (4 min)</a>
               {REPO_URL && <a className="btn btn-lg" href={REPO_URL} target="_blank" rel="noreferrer"><FolderGit2 size={18} /> Code on GitHub</a>}
             </div>
             <p className="hero-note">
