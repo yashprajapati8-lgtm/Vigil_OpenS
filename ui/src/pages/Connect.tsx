@@ -185,6 +185,14 @@ function WatchingNow() {
         })}
       </ul>
       {autonomy && <p className="cx-now-line">Autonomy <b>{autonomy}</b>{config ? <> · <code className="cx-inline">{config}</code></> : null}</p>}
+      {health?.alerts && (
+        <p className="cx-now-line cx-now-alerts">
+          Email alerts{" "}
+          {health.alerts.email === "on"
+            ? <><b>on</b>, to {health.alerts.to?.join(", ")}{health.alerts.last_error ? <span className="cx-now-err"> · last send failed</span> : null}</>
+            : <><b>off</b>: set them in .env</>}
+        </p>
+      )}
     </section>
   );
 }
@@ -192,7 +200,9 @@ function WatchingNow() {
 const READY: Array<[string, boolean, string]> = [
   ["FastAPI services", true, "vigil-instrument, two lines per service"],
   ["Docker Compose", true, "restart, roll back, add capacity on labelled containers"],
-  ["Any other host", true, "watch, diagnose, tell a human (L0 / L1)"],
+  ["Email alerts", true, "when VIGIL acts, needs you, escalates or can't see"],
+  ["Approve from email or phone", false, "next"],
+  ["Any website without code changes (PHP and others)", false, "next"],
   ["Node (Express)", false, "next"],
   ["Kubernetes", false, "planned"],
 ];
@@ -247,7 +257,9 @@ export function Connect() {
               <CopyBlock label="container labels" code={labelsYaml(e)} />
             </Step>
             <Step n={4} title="Start VIGIL beside your app">
-              <p>Only VIGIL: engine, actuator, console and a Prometheus that joins your app's network. None of the demo.</p>
+              <p>Only VIGIL: engine, actuator, console and a Prometheus that joins your app's network. None of the demo.
+                To get emails, add your SMTP details to <code className="cx-inline">deploy/.env</code> first.</p>
+              <CopyBlock label="email settings" code={"VIGIL_SMTP_HOST=smtp.gmail.com\nVIGIL_SMTP_USER=you@gmail.com\nVIGIL_SMTP_PASSWORD=<a Gmail app password>\nVIGIL_ALERT_TO=oncall@yourcollege.edu"} />
               <CopyBlock label="start command" code={"cd deploy\ndocker compose up --build -d"} />
             </Step>
             <Step n={5} title="Watch it learn">

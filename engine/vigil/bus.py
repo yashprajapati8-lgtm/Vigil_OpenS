@@ -4,12 +4,21 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
+
+log = logging.getLogger("vigil.bus")
 
 
 class Bus:
     def __init__(self) -> None:
         self._subs: set[asyncio.Queue] = set()
         self._loop: asyncio.AbstractEventLoop | None = None
+        self._watchers: list = []
+
+    def watch(self, callback) -> None:
+        """Also hand every message to `callback` (e.g. email alerts). It runs on the
+        publisher's thread, so it must only queue work, never do it."""
+        self._watchers.append(callback)
 
     def bind(self, loop: asyncio.AbstractEventLoop) -> None:
         self._loop = loop
@@ -31,6 +40,11 @@ class Bus:
 
     def publish(self, message: dict) -> None:
         """Safe to call from the event loop or from a worker thread."""
+        for watcher in self._watchers:
+            try:
+                watcher(message)
+            except Exception:  # an alert problem must never stop VIGIL
+                log.exception("bus watcher failed")
         if self._loop is None:
             return
         try:

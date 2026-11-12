@@ -23,6 +23,7 @@ from .diagnosis import (SURGE_FACTOR, CATEGORY_LABEL, blame_walk, build_evidence
 from .incidents import IncidentManager
 from .actuator_client import ActuatorClient
 from .llm import LLMClient, system_prompt
+from .notify import Notifier
 from .policy import Governor
 from .remediation import Remediator
 from .store import Store
@@ -38,6 +39,10 @@ class Engine:
         self.collector = collector
         self.store = store
         self.bus = bus
+        # Email alerts: watches every event VIGIL publishes (off unless SMTP is set).
+        self.notifier = Notifier(settings, store)
+        if bus is not None:
+            bus.watch(self.notifier.on_message)
         self.incidents = IncidentManager(store, settings, bus.publish)
         self.detectors = {svc: ServiceDetector(svc, settings) for svc in settings.monitored}
         self.history: deque[dict] = deque(maxlen=settings.history_points)
@@ -429,6 +434,7 @@ class Engine:
             "uptime_s": round(time.time() - self.started_at),
             "edges": sorted(f"{a}->{b}" for a, b in self.incidents.edges),
             "llm": "on" if self.llm.enabled else "off (no GROQ_API_KEY): diagnoses capped at Medium",
+            "alerts": self.notifier.status(),
             "site": {"name": self.s.site_name, "config": self.s.config_path, "entry": self.s.user_facing,
                      "unit": self.s.unit, "units": self.s.units, "services": list(self.s.monitored),
                      "allowed": {svc: sorted(self.s.allowed(svc)) for svc in self.s.monitored},

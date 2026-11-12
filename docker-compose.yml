@@ -151,6 +151,15 @@ services:
       VIGIL_DATA_DIR: /data
       VIGIL_BASELINE_SECONDS: ${VIGIL_BASELINE_SECONDS:-180}
       VIGIL_ADAPT: ${VIGIL_ADAPT:-1}
+      # Email alerts (off unless VIGIL_SMTP_HOST and VIGIL_ALERT_TO are set in .env)
+      VIGIL_SMTP_HOST: ${VIGIL_SMTP_HOST:-}
+      VIGIL_SMTP_PORT: ${VIGIL_SMTP_PORT:-587}
+      VIGIL_SMTP_USER: ${VIGIL_SMTP_USER:-}
+      VIGIL_SMTP_PASSWORD: ${VIGIL_SMTP_PASSWORD:-}
+      VIGIL_SMTP_SECURITY: ${VIGIL_SMTP_SECURITY:-starttls}
+      VIGIL_ALERT_TO: ${VIGIL_ALERT_TO:-}
+      VIGIL_ALERT_FROM: ${VIGIL_ALERT_FROM:-}
+      VIGIL_CONSOLE_URL: ${VIGIL_CONSOLE_URL:-http://localhost:3000}
       VIGIL_ADMIN_TOKEN: ${VIGIL_ADMIN_TOKEN:?Set VIGIL_ADMIN_TOKEN in .env (copy .env.example)}
       VIGIL_UI_ORIGINS: http://localhost:5173
       VIGIL_AUTONOMY: ${VIGIL_AUTONOMY:-}  # empty: vigil.yaml decides

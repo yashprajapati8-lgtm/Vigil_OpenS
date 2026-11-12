@@ -78,6 +78,8 @@ export interface Health {
   control: Control;
   /** The site from vigil.yaml (absent from older engines and recorded replays: the demo shop). */
   site?: SiteInfo;
+  /** Email alerts (absent from older engines). */
+  alerts?: { email: "on" | "off"; to?: string[]; sent?: number; last_error?: string | null; why?: string };
 }
 
 export interface SiteInfo {

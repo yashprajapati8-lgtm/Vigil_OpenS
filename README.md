@@ -20,6 +20,56 @@ right fix inside strict guardrails, and only calls it done when real checkouts r
 | **Try it in your browser** (a real recorded run, nothing to install) | **https://vigil-six-blue.vercel.app** |
 | **Proving Ground scorecard** | **5/5 passed** across 4 real faults and a quiet period: median detection 18.8 s, median verified recovery 1m 15s, 0 false alarms |
 
+## CodeQuest Round 2: what this repository is
+
+**VIGIL as an open-source layer you can put beside your own site.** The October 2026 prototype
+(disclosed below) was one demo shop; this round turns it into something any site can use and
+adds what a real deployment needs.
+
+**New in this round (10 to 12 Nov 2026):**
+
+- **Adaptive baseline.** After the first 3 minutes VIGIL keeps learning normal from healthy
+  traffic (2 h window, re-learned every 10 min), never from an incident, and reports a slow rise
+  as *baseline drift* for a human to accept. Simulated: traffic tripling over 6 h raised 28 false
+  incidents with the old frozen baseline and 0 with the new one.
+- **`vigil.yaml`: one file describes any site.** Services, who calls whom, what customers come to
+  do ("checkout", "result lookup"), which fixes are allowed per service, autonomy. Strict: a typo
+  stops VIGIL with the exact key named. [`examples/results-portal.yaml`](examples/results-portal.yaml)
+  describes a university results portal.
+- **Console for any site.** The service map lays itself out from the real call graph; every
+  message uses the site's words; each card shows when its normal was last learned, and drift
+  with an *Accept new normal* button. A live chart shows VIGIL learning normal, spike by spike.
+- **Add VIGIL to your own app** ([guide](docs/ADD_TO_YOUR_APP.md)): a FastAPI package
+  (`instrument/python`, two lines per service), `scripts/vigil_init.py` (asks about your site,
+  writes the config), and `deploy/` (only VIGIL, beside your services). A *Connect* tab in the
+  console walks through it. A contract test checks every series VIGIL's collector reads exists in
+  what the package exports.
+- **Email alerts.** VIGIL runs on a server nobody sits at; the email is how it reaches a person:
+  when it fixes something on its own (what it found, every step), needs approval, escalates,
+  can't see your services, or a service's normal keeps rising. Once per incident each, off unless
+  configured (see *Email alerts* below).
+- **Fixed:** the console's *Fresh start* button never sent the operator token, so it silently failed.
+
+**Proving Ground on the new code (11 Nov 2026):** all 6 scenarios passed across two sessions. The
+first session scored 4/6: *bad deploy* never ran (a stale container from the earlier install
+pointed at a removed Docker network) and *flash sale* escalated (the original payment instance
+hung under 6x load and the 3-actions-per-10-minutes budget was already used). Both were re-run
+after recreating the container and passed: flash sale recovered in 77.7 s, bad deploy rolled back
+in 80.6 s.
+
+**Not done yet, said plainly:** approving a fix from email or phone, watching sites without code
+changes (PHP and others), Node, databases, Kubernetes. VIGIL fixes only what runs in Docker on the
+same machine; anywhere else it can watch and diagnose.
+
+**Disclosures.**
+- *Pre-existing work:* VIGIL started as my prototype in October 2026. The videos and the hosted
+  replay linked above show that version; everything listed under *New in this round* was built
+  for this round.
+- *AI assistance:* I built this with an AI coding assistant (Anthropic's Claude) for code,
+  tests and documentation. I directed the design and reviewed, ran and tested the results.
+- *Third-party:* Prometheus, FastAPI, scikit-learn, React and the other open-source libraries
+  listed under *Tech stack*, under their own licenses. VIGIL itself is MIT licensed.
+
 ## The problem
 
 The outage that hurts most is the one that looks healthy. In our demo shop, inventory slows
@@ -101,9 +151,11 @@ Median detection **18.8 s**, median verified recovery **74.6 s**, **0** false al
 
 ## Run it (Windows, Docker Desktop)
 
-Open PowerShell in this folder:
+In PowerShell:
 
 ```powershell
+git clone https://github.com/yashprajapati8-lgtm/Vigil_OpenS.git
+cd Vigil_OpenS
 copy .env.example .env      # then edit .env: set CHAOS_TOKEN and VIGIL_ADMIN_TOKEN
 docker compose up --build -d
 docker compose ps           # every container should be "running" (services: "healthy")
@@ -120,6 +172,28 @@ docker compose ps           # every container should be "running" (services: "he
 | http://localhost:8080/api/events | VIGIL's narration: every step it took, in plain English |
 
 Stop everything: `docker compose down`.
+
+## Email alerts (optional)
+
+Add to `.env`, then `docker compose up -d vigil-engine`:
+
+```env
+VIGIL_SMTP_HOST=smtp.gmail.com
+VIGIL_SMTP_USER=you@gmail.com
+VIGIL_SMTP_PASSWORD=<a Gmail app password: myaccount.google.com/apppasswords>
+VIGIL_ALERT_TO=you@gmail.com
+VIGIL_CONSOLE_URL=http://<this laptop's Wi-Fi IP>:3000   # so the link opens on your phone
+```
+
+Check it before you need it (operator token required):
+
+```powershell
+$t = ((Get-Content .env | Select-String '^VIGIL_ADMIN_TOKEN=').Line -split '=',2)[1]
+Invoke-RestMethod -Method Post http://localhost:8080/api/alerts/test -Headers @{ 'X-Vigil-Token' = $t }
+```
+
+Then inject the flash sale from the Chaos Lab: one email when VIGIL starts fixing it (root cause,
+decision, every step so far) and one when it's verified (how long, how many checkouts failed).
 
 ## The command center (http://localhost:3000/console)
 
@@ -416,7 +490,7 @@ pip install -r requirements-dev.txt
 pytest -q
 ```
 
-169 tests, including the adaptive baseline (traffic tripling over 6 h opens nothing; a slow latency creep is held and reported as drift), `vigil.yaml` validation and allowed-fix rules, the leak fixed before the crash, the flash-sale scale-out and scale-in, "real demand is never answered with a restart", the bad-deploy rollback (old version up before the bad one stops; restart never wakes a stopped version), the busy-laptop false alarm (now filtered), the operator lock, the full decide-act-verify loop, approvals, the kill switch, a fault
+180 tests, including email alerts (the right moments, once each, never able to slow VIGIL), the adaptive baseline (traffic tripling over 6 h opens nothing; a slow latency creep is held and reported as drift), `vigil.yaml` validation and allowed-fix rules, the leak fixed before the crash, the flash-sale scale-out and scale-in, "real demand is never answered with a restart", the bad-deploy rollback (old version up before the bad one stops; restart never wakes a stopped version), the busy-laptop false alarm (now filtered), the operator lock, the full decide-act-verify loop, approvals, the kill switch, a fault
 that survives a restart (escalates, no loop), actuator refusals and the policy math. Also 40 simulated clean half-hours with zero false incidents, detection in
 exactly 3 ticks, leak prediction before the crash, telemetry outages, restart mid-incident,
 the blame walk, every category rule, LLM hallucination/outage/retry handling, and the

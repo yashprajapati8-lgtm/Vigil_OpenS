@@ -164,6 +164,18 @@ def reset_baseline(service: str | None = None, x_vigil_token: str | None = Heade
     return {"relearning": targets}
 
 
+@app.post("/api/alerts/test")
+def test_alert(x_vigil_token: str | None = Header(None)):
+    """Send one test email now, to check the SMTP settings in .env before you need them."""
+    require_admin(x_vigil_token)
+    try:
+        _engine().notifier.send_test()
+    except Exception as exc:
+        # The reason (wrong password, blocked port) is what the operator needs; never the password.
+        raise HTTPException(status_code=502, detail=f"test email failed: {type(exc).__name__}: {exc}")
+    return {"sent": True, "to": _engine().notifier.status().get("to")}
+
+
 @app.post("/api/baseline/accept")
 def accept_baseline(service: str, x_vigil_token: str | None = Header(None)):
     """A human confirms a service's drifted normal is right (e.g. a new, slower but

@@ -38,6 +38,15 @@ services:
       VIGIL_ADMIN_TOKEN: ${VIGIL_ADMIN_TOKEN:?Set VIGIL_ADMIN_TOKEN in .env}
       VIGIL_AUTONOMY: ${VIGIL_AUTONOMY:-}          # empty: vigil.yaml decides
       VIGIL_ADAPT: ${VIGIL_ADAPT:-1}
+      # Email alerts (off unless VIGIL_SMTP_HOST and VIGIL_ALERT_TO are set in .env)
+      VIGIL_SMTP_HOST: ${VIGIL_SMTP_HOST:-}
+      VIGIL_SMTP_PORT: ${VIGIL_SMTP_PORT:-587}
+      VIGIL_SMTP_USER: ${VIGIL_SMTP_USER:-}
+      VIGIL_SMTP_PASSWORD: ${VIGIL_SMTP_PASSWORD:-}
+      VIGIL_SMTP_SECURITY: ${VIGIL_SMTP_SECURITY:-starttls}
+      VIGIL_ALERT_TO: ${VIGIL_ALERT_TO:-}
+      VIGIL_ALERT_FROM: ${VIGIL_ALERT_FROM:-}
+      VIGIL_CONSOLE_URL: ${VIGIL_CONSOLE_URL:-http://localhost:3000}
       ACTUATOR_URL: http://vigil-actuator:8000
       ACTUATOR_TOKEN: ${VIGIL_ADMIN_TOKEN:?Set VIGIL_ADMIN_TOKEN in .env}
       GROQ_API_KEY: ${GROQ_API_KEY:-}              # optional second opinion; without it, confidence is capped at Medium

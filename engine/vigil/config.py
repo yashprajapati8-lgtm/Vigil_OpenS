@@ -83,6 +83,21 @@ class Settings:
     adapt_step_z: float = _f("VIGIL_ADAPT_STEP_Z", 1.0)         # normal moves at most 1 sigma per re-learn
     drift_max_z: float = _f("VIGIL_DRIFT_MAX_Z", 3.0)           # ...and at most 3 sigma from what a human accepted
 
+    # Email alerts (notify.py): off unless an SMTP host and a recipient are set.
+    # VIGIL runs on a server nobody sits at; email is how it reaches a person.
+    smtp_host: str = os.getenv("VIGIL_SMTP_HOST", "")
+    smtp_port: int = _i("VIGIL_SMTP_PORT", 587)
+    smtp_user: str = os.getenv("VIGIL_SMTP_USER", "")
+    smtp_password: str = os.getenv("VIGIL_SMTP_PASSWORD", "")           # Gmail: an app password
+    smtp_security: str = os.getenv("VIGIL_SMTP_SECURITY", "starttls")   # starttls | ssl | none
+    alert_to: tuple[str, ...] = tuple(a.strip() for a in os.getenv("VIGIL_ALERT_TO", "").split(",") if a.strip())
+    alert_from: str = os.getenv("VIGIL_ALERT_FROM", "")                 # default: the SMTP user
+    # Which moments send an email. Each goes at most once per incident.
+    alert_on: tuple[str, ...] = tuple(a.strip() for a in os.getenv(
+        "VIGIL_ALERT_ON", "acting,awaiting_approval,escalated,resolved,telemetry_degraded,baseline_drift").split(",") if a.strip())
+    alert_max_per_hour: int = _i("VIGIL_ALERT_MAX_PER_HOUR", 20)
+    console_url: str = os.getenv("VIGIL_CONSOLE_URL", "http://localhost:3000")   # links in emails
+
     # Detection rule (see detector.py).
     z_flag: float = _f("VIGIL_Z_FLAG", 3.0)
     z_extreme: float = _f("VIGIL_Z_EXTREME", 6.0)

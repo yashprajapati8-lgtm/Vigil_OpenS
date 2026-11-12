@@ -891,3 +891,5 @@ a { color: var(--vigil); }
 .fresh-bar { display: block; height: 4px; margin-top: 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.06); overflow: hidden; }
 .fresh-bar span { display: block; height: 100%; border-radius: inherit; background: var(--vigil); transition: width 1s linear; }
 @media (prefers-reduced-motion: reduce) { .fresh-status { animation: none; } .fresh-bar span { transition: none; } }
+.cx-now-alerts { margin-top: 6px; }
+.cx-now-err { color: #f9a39b; }
