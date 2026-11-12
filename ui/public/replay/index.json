@@ -1,5 +1,5 @@
 {
- "recorded_at": 1792496019.321,
+ "recorded_at": 1794370376.544,
  "chapters": [
   {
    "scenario": "slow-inventory",
@@ -7,8 +7,8 @@
    "file": "slow-inventory.json",
    "result": {
     "pass": true,
-    "mttd_s": 18.0,
-    "mttr_s": 73.0,
+    "mttd_s": 17.6,
+    "mttr_s": 77.7,
     "actions": [
      "restart inventory"
     ],
@@ -21,8 +21,8 @@
    "file": "bad-deploy.json",
    "result": {
     "pass": true,
-    "mttd_s": 17.9,
-    "mttr_s": 77.9,
+    "mttd_s": 20.6,
+    "mttr_s": 80.6,
     "actions": [
      "rollback payment"
     ],
@@ -35,8 +35,8 @@
    "file": "flash-sale.json",
    "result": {
     "pass": true,
-    "mttd_s": 19.5,
-    "mttr_s": 74.6,
+    "mttd_s": 22.7,
+    "mttr_s": 77.7,
     "actions": [
      "scale_out payment"
     ],
@@ -49,8 +49,22 @@
    "file": "payment-leak.json",
    "result": {
     "pass": true,
-    "mttd_s": 24.6,
-    "mttr_s": 74.6,
+    "mttd_s": 25.0,
+    "mttr_s": 90.1,
+    "actions": [
+     "restart payment"
+    ],
+    "root": "payment"
+   }
+  },
+  {
+   "scenario": "payment-runaway",
+   "label": "Runaway loop in payment",
+   "file": "payment-runaway.json",
+   "result": {
+    "pass": true,
+    "mttd_s": 16.7,
+    "mttr_s": 76.7,
     "actions": [
      "restart payment"
     ],

@@ -18,7 +18,7 @@ right fix inside strict guardrails, and only calls it done when real checkouts r
 | **▶️ MUST WATCH: live demo (3 min)** | **https://youtu.be/5g_4jCZjP8M** |
 | **Full walkthrough (5 min, voiced)** | **https://youtu.be/AQKw7XUuKtk** |
 | **Try it in your browser** (a real recorded run, nothing to install) | **https://vigil-six-blue.vercel.app** |
-| **Proving Ground scorecard** | **5/5 passed** across 4 real faults and a quiet period: median detection 18.8 s, median verified recovery 1m 15s, 0 false alarms |
+| **Proving Ground scorecard** | **6/6 passed** on this round's code (11 Nov 2026), 5 real faults and a quiet period: median detection 20.6 s, median verified recovery 1m 18s, 0 false alarms |
 
 ## CodeQuest Round 2: what this repository is
 
@@ -62,9 +62,9 @@ changes (PHP and others), Node, databases, Kubernetes. VIGIL fixes only what run
 same machine; anywhere else it can watch and diagnose.
 
 **Disclosures.**
-- *Pre-existing work:* VIGIL started as my prototype in October 2026. The videos and the hosted
-  replay linked above show that version; everything listed under *New in this round* was built
-  for this round.
+- *Pre-existing work:* VIGIL started as my prototype in October 2026. The videos linked above
+  show that version; the hosted replay plays the 11 Nov 2026 Proving Ground run on this round's
+  code. Everything listed under *New in this round* was built for this round.
 - *AI assistance:* I built this with an AI coding assistant (Anthropic's Claude) for code,
   tests and documentation. I directed the design and reviewed, ran and tested the results.
 - *Third-party:* Prometheus, FastAPI, scikit-learn, React and the other open-source libraries
@@ -116,17 +116,20 @@ Every 5 seconds it runs one loop: **observe → detect → diagnose → decide �
 `docker compose --profile prove run --rm proving-ground` injects every fault for real, scores
 VIGIL against an answer key it never sees, and checks for false alarms during a quiet period.
 
-Final run (2 sessions on 20 Oct 2026, autonomy L3). Times are from the moment the fault was injected:
+Final run on this round's code (2 sessions on 11 Nov 2026, autonomy L3; flash sale and bad deploy
+are from the second session, see above). Times are from the moment the fault was injected:
 
 | Scenario | Expected fix | VIGIL's root | VIGIL's fix | Detect | Recovered | Checkouts lost | Result |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Quiet period (180s, nothing broken) | no incident | – | – | – | – | – | PASS |
-| Slow inventory (gray failure) | restart inventory | inventory (stuck_process) | restart inventory | 18.0 s | 73.0 s | 598 | PASS |
-| Memory leak in payment | restart payment | payment (resource_leak) | restart payment | 24.6 s | 74.6 s | 53 | PASS |
-| Flash sale (real demand, 6x) | scale out payment | payment (load_saturation) | scale_out payment | 19.5 s | 74.6 s | 465 | PASS |
-| Bad deploy (payment v2) | rollback payment | payment (regression_after_change) | rollback payment | 17.9 s | 77.9 s | 237 | PASS |
+| Slow inventory (gray failure) | restart inventory | inventory (stuck_process) | restart inventory | 17.6 s | 77.7 s | 777 | PASS |
+| Memory leak in payment | restart payment | payment (resource_leak) | restart payment | 25.0 s | 90.1 s | 64 | PASS |
+| Flash sale (real demand, 6x) | scale out payment | payment (load_saturation) | scale_out payment | 22.7 s | 77.7 s | 510 | PASS |
+| Bad deploy (payment v2) | rollback payment | payment (regression_after_change) | rollback payment | 20.6 s | 80.6 s | 263 | PASS |
+| Runaway loop in payment | restart payment | payment (crashed) | restart payment | 16.7 s | 76.7 s | 709 | PASS |
 
-Median detection **18.8 s**, median verified recovery **74.6 s**, **0** false alarms. The runaway-loop scenario is in the code but wasn't part of this run.
+Median detection **20.6 s**, median verified recovery **77.7 s**, **0** false alarms. Every run is
+recorded, and the hosted replay plays these five faults exactly as they happened.
 
 ## Tech stack
 
