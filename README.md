@@ -17,7 +17,7 @@ right fix inside strict guardrails, and only calls it done when real checkouts r
 | --- | --- |
 | **▶️ MUST WATCH: demo (4 min)** | **https://youtu.be/qtrbB_tZ86c** |
 | **Earlier prototype videos (Oct 2026)** | [live demo, 3 min](https://youtu.be/5g_4jCZjP8M) · [walkthrough, 5 min](https://youtu.be/AQKw7XUuKtk) |
-| **Try it in your browser** (a real recorded run, nothing to install) | **https://vigil-six-blue.vercel.app** |
+| **Try it in your browser** (the 11 Nov 2026 recorded runs on this round's code, nothing to install) | **https://vigil-open-s.vercel.app** |
 | **Proving Ground scorecard** | **6/6 passed** on this round's code (11 Nov 2026), 5 real faults and a quiet period: median detection 20.6 s, median verified recovery 1m 18s, 0 false alarms |
 
 ## CodeQuest Round 2: what this repository is
