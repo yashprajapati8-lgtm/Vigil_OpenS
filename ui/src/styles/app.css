@@ -920,5 +920,12 @@ a { color: var(--vigil); }
 .ea-note { margin: 10px 0 0; font-size: 13px; line-height: 1.45; color: #9fe0c0; }
 .ea-note[data-kind="error"] { color: #f9a39b; }
 .ea-sub { margin: 8px 0 0; font-size: 12px; color: var(--text-3); }
+.ea-mail { margin-top: 14px; padding: 14px 16px; border-radius: var(--radius-btn); background: var(--well); box-shadow: var(--well-edge); border-left: 3px solid var(--vigil); }
+.ea-mail-subject { margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
+.ea-mail-head { margin: 0 0 10px; font-size: 13px; line-height: 1.5; color: var(--text-2); }
+.ea-mail-steps { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.ea-mail-steps li { font-size: 12.5px; line-height: 1.45; color: var(--text-2); }
+.ea-mail-steps time { display: inline-block; min-width: 64px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.rl-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 4px 0 10px; }
 .icon-btn[data-on] { color: var(--vigil); }
 @media (prefers-reduced-motion: reduce) { .ea-list li { animation: none; } }

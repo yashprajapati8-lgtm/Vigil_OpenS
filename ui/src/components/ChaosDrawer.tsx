@@ -160,6 +160,11 @@ export function ChaosDrawer({ onClose }: { onClose: () => void }) {
           <span className="panel-sub">{REPLAY
             ? "Stopping returns to the calm moment before the fault. In the live app, VIGIL never uses reset; it fixes faults with real container actions."
             : "Reset is for demo re-runs. VIGIL never uses it; it fixes faults with real container actions."}</span>
+          {REPLAY && <>
+            <HoldButton className="hold-reset" label="Hold for a fresh start (watch VIGIL learn normal)" doneLabel="Learning: watch the page"
+              holdMs={1500} onFire={() => { window.dispatchEvent(new Event("vigil:replay-learn")); onClose(); }} />
+            <span className="panel-sub">Plays this recording's own readings through the learning chart, sped up: the live app takes about 3 minutes.</span>
+          </>}
           {!REPLAY && <>
             <HoldButton className="hold-reset" label="Hold for a fresh start (relearn normal)" doneLabel="Fresh start running"
               holdMs={1500} onFire={freshStart} disabled={fresh?.kind === "settling"} />

@@ -113,10 +113,10 @@ export function ControlCapsule({ unlocked, runAsOperator, onLock, onLocked }: Pr
         <span className="switch-knob">{control?.paused ? <Pause size={18} /> : <Play size={18} />}</span>
         Actions {control?.paused ? "paused" : "armed"}
       </button>
-      {health?.alerts && !REPLAY && (
-        <button type="button" className="icon-btn" data-on={health.alerts.email === "on" || undefined}
-          aria-label={`Email alerts: ${health.alerts.email}. Choose who gets them`}
-          title={health.alerts.email === "on" ? `Email alerts on: ${health.alerts.to?.join(", ")}` : "Email alerts are off: set them up"}
+      {(REPLAY || health?.alerts) && (
+        <button type="button" className="icon-btn" data-on={health?.alerts?.email === "on" || undefined}
+          aria-label={REPLAY ? "Email alerts: see the email VIGIL sends" : `Email alerts: ${health?.alerts?.email}. Choose who gets them`}
+          title={REPLAY ? "Email alerts: see the email VIGIL sends for this run" : health?.alerts?.email === "on" ? `Email alerts on: ${health?.alerts?.to?.join(", ")}` : "Email alerts are off: set them up"}
           onClick={() => { navigate("/connect"); window.setTimeout(() => document.getElementById("email-alerts")?.scrollIntoView({ behavior: "smooth", block: "start" }), 120); }}>
           <Mail size={18} />
         </button>

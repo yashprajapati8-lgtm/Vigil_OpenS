@@ -1,5 +1,6 @@
-import { CircleAlert, FlaskConical, GraduationCap, Pause, Play } from "lucide-react";
+import { CircleAlert, FlaskConical, GraduationCap, Pause, Play, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import type { Point } from "../api/types";
 import { player, REPLAY, REPO_URL } from "../replay/player";
 import { duration } from "../lib/format";
 import { LIVE_VIDEO_URL } from "../lib/links";
@@ -67,6 +68,72 @@ function LearningPanel() {
   );
 }
 
+// Replay only: the live app relearns normal after a Fresh start, which a recording
+// can't do. This plays the recording's own p95 readings through the same chart and
+// the same maths, sped up (one 5 s reading every 0.4 s), so the learning is shown
+// with real data and nothing invented.
+const LEARN_WINDOW = 36;
+const LEARN_STEP_MS = 400;
+
+function ReplayLearnPanel() {
+  const { history } = useVigil();
+  const [readings, setReadings] = useState<Point[] | null>(null);
+  const [n, setN] = useState(0);
+  const [picked, setPicked] = useState<string | null>(null);
+
+  useEffect(() => {
+    const start = () => {
+      setReadings(history.slice(-LEARN_WINDOW));
+      setN(4);
+    };
+    window.addEventListener("vigil:replay-learn", start);
+    return () => window.removeEventListener("vigil:replay-learn", start);
+  }, [history]);
+
+  const total = readings ? readings.length : 0;
+  useEffect(() => {
+    if (!readings || n >= total) return;
+    const t = window.setTimeout(() => setN((x) => x + 1), LEARN_STEP_MS);
+    return () => window.clearTimeout(t);
+  }, [readings, n, total]);
+
+  if (!readings || total < 4) return null;
+  const services: string[] = [];
+  for (const p of readings) {
+    for (const s of Object.keys(p.services)) {
+      if (!services.includes(s)) services.push(s);
+    }
+  }
+  const shown = picked && services.includes(picked) ? picked : services[0];
+  const progress = Math.min(1, n / LEARN_WINDOW);
+  const done = n >= total;
+  const pct = done ? 100 : Math.round(progress * 100);
+  return (
+    <section className="learning panel" role="status" aria-live="polite" aria-label={`VIGIL is learning normal traffic, ${pct}%`}>
+      <div className="learning-icon" aria-hidden="true"><GraduationCap size={22} /></div>
+      <div className="learning-body">
+        <div className="learning-top">
+          <h2>{done ? "VIGIL has learned what normal looks like" : "VIGIL is learning what normal looks like"}</h2>
+          <span className="learning-num"><b>{pct}%</b><span>{done ? "detection on" : "recorded readings, sped up"}</span></span>
+          <button type="button" className="icon-btn" aria-label="Close the learning chart" onClick={() => setReadings(null)}><X size={16} /></button>
+        </div>
+        <div className="learning-services" role="tablist" aria-label="Service to show">
+          {services.map((s) => (
+            <button key={s} type="button" role="tab" aria-selected={s === shown} data-done={done}
+              onClick={() => setPicked(s)}>{s} {done ? "ready" : `${pct}%`}</button>
+          ))}
+        </div>
+        <LearningChart service={shown} history={readings.slice(0, n)} progress={done ? 1 : progress} />
+        <p>
+          Every dot is {shown}'s p95 latency from this recording, 5 s apart (played here at 0.4 s each). VIGIL takes
+          the median, so readings near normal shape the band and a far spike barely moves it. In the live app this
+          takes about 3 minutes after a Fresh start; after that it keeps learning, from healthy readings only.
+        </p>
+      </div>
+    </section>
+  );
+}
+
 function useReplayState() {
   const [, tick] = useState(0);
   useEffect(() => player.onChange(() => tick((n) => n + 1)), []);
@@ -114,6 +181,7 @@ export function Banners() {
   return (
     <>
       {REPLAY && <ReplayBanner />}
+      {REPLAY && <ReplayLearnPanel />}
       <LearningPanel />
       {health?.control.paused && (
         <div className="banner banner-warn" role="status">
