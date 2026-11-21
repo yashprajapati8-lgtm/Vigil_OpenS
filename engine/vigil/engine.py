@@ -26,6 +26,7 @@ from .llm import LLMClient, system_prompt
 from .notify import Notifier
 from .policy import Governor
 from .remediation import Remediator
+from .schedule import Schedule
 from .store import Store
 
 log = logging.getLogger("vigil.engine")
@@ -65,6 +66,9 @@ class Engine:
             self, actuator or ActuatorClient(settings.actuator_url, settings.actuator_token), self.governor)
         self._due_remediation: list[str] = []
         self._due_scale_in: list[str] = []
+        # Rushes vigil.yaml says are coming: start the spare copies before them.
+        self.schedule = Schedule(self)
+        self._due_prepare: list[tuple[dict, str]] = []
         self._ticks = 0
         # After an incident nobody was hurt by is handed to a human, the same service
         # does not open again on a quiet anomaly for a while (it would only repeat the
@@ -102,6 +106,8 @@ class Engine:
                 asyncio.create_task(self._remediate_guarded(inc_id))
         for svc in self._due_scale_in:
             asyncio.create_task(self._guarded(self.remediator.scale_in(svc), f"scale-in of {svc}"))
+        for event, svc in self._due_prepare:
+            asyncio.create_task(self._guarded(self.remediator.prepare(event, svc), f"getting {svc} ready"))
         self._ticks += 1
         if self._ticks % 12 == 1:   # about once a minute: which containers exist, which run
             asyncio.create_task(self._guarded(self.remediator.refresh_inventory(), "inventory refresh"))
@@ -195,6 +201,7 @@ class Engine:
         self._due = self.incidents.due_for_diagnosis(time.time())
         self._due_remediation = self.remediator.due()
         self._due_scale_in = self.remediator.scale_in_due(snap)
+        self._due_prepare = self.schedule.due()
         self._publish_tick(snap)
 
     def _impact(self, svc: str, v: Verdict, snap: Snapshot) -> bool:
@@ -435,6 +442,7 @@ class Engine:
             "edges": sorted(f"{a}->{b}" for a, b in self.incidents.edges),
             "llm": "on" if self.llm.enabled else "off (no GROQ_API_KEY): diagnoses capped at Medium",
             "alerts": self.notifier.status(),
+            "events": self.schedule.view(),
             "site": {"name": self.s.site_name, "config": self.s.config_path, "entry": self.s.user_facing,
                      "unit": self.s.unit, "units": self.s.units, "services": list(self.s.monitored),
                      "allowed": {svc: sorted(self.s.allowed(svc)) for svc in self.s.monitored},

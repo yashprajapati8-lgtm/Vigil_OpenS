@@ -18,6 +18,7 @@ from .actuator_client import ActuatorClient, ActuatorError
 from .diagnosis import CATEGORY_LABEL
 from .incidents import fmt_duration
 from .policy import Governor, Option, new_action_id, options_table, price_options
+from .schedule import clock
 
 if TYPE_CHECKING:
     from .engine import Engine
@@ -397,12 +398,51 @@ class Remediator:
             self._calm[option.target] = 0
         return [result]
 
+    async def prepare(self, event: dict, svc: str) -> None:
+        """An event from vigil.yaml is coming (schedule.py): start the spare copy now,
+        before the rush, so it is already serving when students arrive."""
+        key = (event["name"], svc)
+        with self.e.lock:
+            if key in self.e.schedule.prepared:
+                return
+            self.e.schedule.prepared.add(key)      # try once per window, never in a loop
+        try:
+            managed = await self.actuator.containers()
+            spare = None
+            for c in managed:
+                if c.get("service") == svc and c.get("role") == "replica" and c.get("status") != "running":
+                    spare = c
+                    break
+            if spare is None:
+                raise ActuatorError(f"no stopped {svc} spare copy to start (create one with "
+                                    f"`docker compose --profile replica create {svc}-replica`)")
+            result = await self.actuator.act(new_action_id(), "start", spare["name"])
+            await self._wait_ready(spare["name"], "the original copy keeps serving")
+            with self.e.lock:
+                self.scaled[svc] = {"container": spare["name"], "since": time.time(), "incident": None,
+                                    "event": event["name"]}
+                self._calm[svc] = 0
+                took = result.get("duration_ms", 0) / 1000
+                self._event(None, "act", "executor", "prepared",
+                            f"Getting ready for {event['name']} at {clock(event['at'])}: started {spare['name']} "
+                            f"({took:.1f} s), so {svc} has two copies before the rush. It stays at least until "
+                            f"{clock(event['at'] + event['lasts_s'])}",
+                            {"event": event["name"], "service": svc, "container": spare["name"]})
+        except ActuatorError as exc:
+            with self.e.lock:
+                self._event(None, "act", "executor", "action_failed",
+                            f"Could not get {svc} ready for {event['name']}: {exc}",
+                            {"event": event["name"], "service": svc})
+
     def scale_in_due(self, snap) -> list[str]:
         """Scaled-out services whose traffic has been back near normal for a while,
         with no open incident on them. Runs every tick under the engine lock."""
         due = []
         for svc in list(self.scaled):
             if svc in self._scaling_in or self.gov.paused:
+                continue
+            if self.e.schedule.holds(svc):
+                self._calm[svc] = 0       # inside an event's window: the spare copy stays
                 continue
             det = self.e.detectors.get(svc)
             base = det.baseline.medians.get("rps") if det and det.baseline else None

@@ -16,6 +16,7 @@ import logging
 import os
 import re
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 
 log = logging.getLogger("vigil.config")
@@ -64,6 +65,9 @@ class Settings:
     user_duration_metric: str | None = "checkout_duration_seconds"
     # Fixes allowed per service; a service not listed may get every fix in ACTIONS.
     allowed_actions: dict[str, frozenset[str]] = field(default_factory=dict)
+    # Rushes you know are coming (vigil.yaml `events`, see schedule.py): VIGIL starts
+    # the spare copies before each one. Each is {name, at, prepare_s, lasts_s, services}.
+    events: tuple[dict, ...] = ()
     # One line per service (and the entry) that the dashboard shows under its name.
     about: dict[str, str] = field(default_factory=lambda: {
         "storefront": "Where customers check out", "payment": "Charges the card", "inventory": "Reserves the stock"})
@@ -207,7 +211,7 @@ def parse_site(doc) -> dict:
     """Validate a parsed vigil.yaml and return the Settings fields it sets.
     Every mistake is a ConfigError that names the exact key: VIGIL must never
     watch the wrong thing quietly because of a typo."""
-    doc = _keys("vigil.yaml", doc, {"version", "customers", "services"}, {"site", "autonomy"})
+    doc = _keys("vigil.yaml", doc, {"version", "customers", "services"}, {"site", "autonomy", "events"})
     if doc["version"] != 1:
         raise ConfigError(f"vigil.yaml: version {doc['version']!r} is not supported (this build reads version 1)")
     out: dict = {}
@@ -277,11 +281,74 @@ def parse_site(doc) -> dict:
     out["allowed_actions"] = allowed
     out["about"] = about
 
+    if "events" in doc:
+        out["events"] = parse_events(doc["events"], names, allowed)
+
     if "autonomy" in doc:
         if doc["autonomy"] not in AUTONOMY_LEVELS:
             raise ConfigError(f"autonomy: {doc['autonomy']!r} is not one of {', '.join(AUTONOMY_LEVELS)}")
         out["autonomy"] = doc["autonomy"]
     return out
+
+
+def parse_events(value, services: list[str], allowed: dict[str, frozenset[str]]) -> tuple[dict, ...]:
+    """vigil.yaml `events`: rushes you know are coming.
+
+        events:
+          - name: Results declared
+            at: 2026-11-25T10:00+05:30     # date, time and your time zone
+            prepare_min: 10                # start the spare copies this long before (default 10)
+            lasts_min: 60                  # keep them at least this long after `at` (default 60)
+            services: [results-api]        # default: every service allowed scale_out
+    """
+    if not isinstance(value, list):
+        raise ConfigError("events: expected a list (each item: name, at)")
+    out = []
+    for i, item in enumerate(value):
+        where = f"events[{i}]"
+        item = _keys(where, item, {"name", "at"}, {"prepare_min", "lasts_min", "services"})
+        name = item["name"]
+        if not isinstance(name, str) or not 0 < len(name.strip()) <= 60:
+            raise ConfigError(f"{where}.name: expected one short line (1 to 60 characters)")
+
+        # YAML may already read the timestamp as a datetime; otherwise it is text.
+        at = item["at"]
+        if isinstance(at, str):
+            try:
+                at = datetime.fromisoformat(at.strip())
+            except ValueError:
+                raise ConfigError(f"{where}.at: {item['at']!r} is not a date and time like 2026-11-25T10:00+05:30")
+        if not isinstance(at, datetime):
+            raise ConfigError(f"{where}.at: expected a date and time like 2026-11-25T10:00+05:30")
+        if at.tzinfo is None:
+            raise ConfigError(f"{where}.at: add your time zone, e.g. 2026-11-25T10:00+05:30 (VIGIL's clock may "
+                              "not be in your time zone)")
+
+        prepare_min = item.get("prepare_min", 10)
+        lasts_min = item.get("lasts_min", 60)
+        for key, minutes in (("prepare_min", prepare_min), ("lasts_min", lasts_min)):
+            if isinstance(minutes, bool) or not isinstance(minutes, (int, float)) or not 0 <= minutes <= 24 * 60:
+                raise ConfigError(f"{where}.{key}: expected minutes, 0 to 1440")
+
+        if "services" in item:
+            targets = _str_list(f"{where}.services", item["services"], _NAME, "service name")
+            for t in targets:
+                if t not in services:
+                    raise ConfigError(f"{where}.services: {t!r} is not under services")
+                if t in allowed and "scale_out" not in allowed[t]:
+                    raise ConfigError(f"{where}.services: {t!r} does not allow scale_out, so VIGIL "
+                                      "cannot start a spare copy of it")
+        else:
+            targets = []
+            for t in services:
+                if t not in allowed or "scale_out" in allowed[t]:
+                    targets.append(t)
+            if not targets:
+                raise ConfigError(f"{where}: no service allows scale_out, so there is nothing to get ready")
+
+        out.append({"name": name.strip(), "at": at.timestamp(), "prepare_s": float(prepare_min) * 60,
+                    "lasts_s": float(lasts_min) * 60, "services": tuple(targets)})
+    return tuple(out)
 
 
 def load_settings(path: str | None = None) -> Settings:
