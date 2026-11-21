@@ -13,6 +13,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from .schedule import EventError, clock
+
 from .bus import Bus
 from .collector import PrometheusCollector
 from .config import SETTINGS
@@ -163,6 +165,55 @@ def reset_baseline(service: str | None = None, x_vigil_token: str | None = Heade
                             payload={"services": targets})
     bus.publish({"type": "event", "event": ev})
     return {"relearning": targets}
+
+
+class NewEvent(BaseModel):
+    name: str
+    at: float                       # Unix time; the console converts the operator's local date and time
+    prepare_min: float = 10
+    lasts_min: float = 60
+
+
+@app.get("/api/results-days")
+def list_results_days():
+    """Rushes VIGIL knows are coming (vigil.yaml and the console), and where each stands."""
+    e = _engine()
+    with e.lock:
+        return {"events": e.schedule.view()}
+
+
+@app.post("/api/results-days")
+def add_results_day(body: NewEvent, x_vigil_token: str | None = Header(None)):
+    """An operator adds a results day (or any known rush) from the console. No restart."""
+    require_admin(x_vigil_token)
+    e = _engine()
+    with e.lock:
+        try:
+            event = e.schedule.add(body.name, body.at, body.prepare_min, body.lasts_min)
+        except EventError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        ev = _store().append_event(stage="system", actor="human", kind="event_added",
+                                   summary=f"Results day added: {event['name']} at {clock(event['at'])}. VIGIL "
+                                           f"starts the spare copy {event['prepare_s'] / 60:.0f} min before",
+                                   payload={"event": event["id"]})
+    bus.publish({"type": "event", "event": ev})
+    return {"event": event}
+
+
+@app.post("/api/results-days/{event_id}/remove")
+def remove_results_day(event_id: str, x_vigil_token: str | None = Header(None)):
+    require_admin(x_vigil_token)
+    e = _engine()
+    with e.lock:
+        try:
+            event = e.schedule.remove(event_id)
+        except EventError as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        ev = _store().append_event(stage="system", actor="human", kind="event_removed",
+                                   summary=f"Results day removed: {event['name']} at {clock(event['at'])}",
+                                   payload={"event": event["id"]})
+    bus.publish({"type": "event", "event": ev})
+    return {"removed": event_id}
 
 
 class Recipient(BaseModel):

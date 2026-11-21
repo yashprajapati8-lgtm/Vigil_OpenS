@@ -442,7 +442,7 @@ class Engine:
             "edges": sorted(f"{a}->{b}" for a, b in self.incidents.edges),
             "llm": "on" if self.llm.enabled else "off (no GROQ_API_KEY): diagnoses capped at Medium",
             "alerts": self.notifier.status(),
-            "events": self.schedule.view(),
+            "results_days": self.schedule.view(),
             "site": {"name": self.s.site_name, "config": self.s.config_path, "entry": self.s.user_facing,
                      "unit": self.s.unit, "units": self.s.units, "services": list(self.s.monitored),
                      "allowed": {svc: sorted(self.s.allowed(svc)) for svc in self.s.monitored},

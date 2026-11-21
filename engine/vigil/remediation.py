@@ -401,7 +401,7 @@ class Remediator:
     async def prepare(self, event: dict, svc: str) -> None:
         """An event from vigil.yaml is coming (schedule.py): start the spare copy now,
         before the rush, so it is already serving when students arrive."""
-        key = (event["name"], svc)
+        key = (event["id"], svc)
         with self.e.lock:
             if key in self.e.schedule.prepared:
                 return

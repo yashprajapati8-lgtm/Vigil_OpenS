@@ -39,3 +39,11 @@ def test_actions_check_the_token_before_touching_the_engine(monkeypatch):
     assert c.post("/api/incidents/VGL-0001/reject", headers={"X-Vigil-Token": "x"}).status_code == 403
     assert c.post("/api/baseline/reset", headers={"X-Vigil-Token": "x"}).status_code == 403
     assert c.post("/api/baseline/accept?service=payment", headers={"X-Vigil-Token": "x"}).status_code == 403
+
+
+def test_adding_or_removing_a_results_day_needs_the_token(monkeypatch):
+    c = client(monkeypatch)
+    body = {"name": "Results declared", "at": 1795581000, "prepare_min": 10, "lasts_min": 60}
+    assert c.post("/api/results-days", json=body).status_code == 403
+    assert c.post("/api/results-days", json=body, headers={"X-Vigil-Token": "x"}).status_code == 403
+    assert c.post("/api/results-days/c-1/remove").status_code == 403

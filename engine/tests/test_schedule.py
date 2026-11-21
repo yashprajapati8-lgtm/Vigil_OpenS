@@ -143,3 +143,40 @@ def test_parse_site_reads_events():
            "events": [{"name": "Results declared", "at": "2026-11-25T10:00+05:30", "prepare_min": 1}]}
     out = parse_site(doc)
     assert out["events"][0]["prepare_s"] == 60
+
+
+# ---- added from the console (no restart)
+
+from vigil.schedule import EventError, Schedule
+
+
+def test_an_event_added_in_the_console_works_like_one_in_vigil_yaml(tmp_path):
+    world, eng, store, act = engine_with(tmp_path, [])
+    eng.schedule.add("Results declared", time.time() + 60, prepare_min=10, lasts_min=60)
+    run_ticks(eng, world, 1)
+    assert [svc for _, svc in eng._due_prepare] == ["payment", "inventory"], "default: every service allowing scale_out"
+    prepare_due(eng)
+    assert ("start", "payment-replica") in act.calls
+    view = eng.schedule.view()
+    assert view[0]["source"] == "console" and view[0]["status"] == "getting ready" and "payment" in view[0]["ready"]
+
+
+def test_console_events_survive_a_restart_and_can_be_removed(tmp_path):
+    world, eng, store, act = engine_with(tmp_path, [])
+    added = eng.schedule.add("Results declared", time.time() + 3600)
+    again = Schedule(eng)                      # VIGIL restarted: read back from data/events.json
+    assert [e["name"] for e in again.all_events()] == ["Results declared"]
+    nxt = again.add("Admissions open", time.time() + 7200)
+    assert nxt["id"] != added["id"], "ids never repeat after a restart"
+    again.remove(added["id"])
+    assert [e["name"] for e in Schedule(eng).all_events()] == ["Admissions open"]
+
+
+def test_console_refuses_what_it_cannot_use(tmp_path):
+    world, eng, store, act = engine_with(tmp_path, [event(time.time() + 3600)])
+    with pytest.raises(EventError, match="already over"):
+        eng.schedule.add("Results declared", time.time() - 3 * 3600, lasts_min=60)
+    with pytest.raises(EventError, match="short name"):
+        eng.schedule.add("  ", time.time() + 3600)
+    with pytest.raises(EventError, match="vigil.yaml"):
+        eng.schedule.remove("yaml-1")          # vigil.yaml events are changed in vigil.yaml

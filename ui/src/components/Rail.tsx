@@ -1,4 +1,4 @@
-import { FlaskConical, Plug, ShoppingBag, Smartphone, Trophy, TriangleAlert } from "lucide-react";
+import { CalendarDays, FlaskConical, Plug, ShoppingBag, Smartphone, Trophy, TriangleAlert } from "lucide-react";
 import { TERMINAL } from "../api/types";
 import { Link } from "../lib/router";
 import { useVigil } from "../state/vigil";
@@ -22,6 +22,10 @@ export function Rail({ path, chaosOpen, onChaos }: { path: string; chaosOpen: bo
         aria-label={`Incidents${open ? `, ${open} open` : ""}`} title="Incidents">
         <TriangleAlert size={22} strokeWidth={1.75} />
         {open > 0 && <span className="badge">{open}</span>}
+      </Link>
+      <Link href="/results-days" className="rail-btn" aria-current={path.startsWith("/results-days") ? "page" : undefined}
+        aria-label="Results days" title="Results days: get ready before a rush you know is coming">
+        <CalendarDays size={22} strokeWidth={1.75} />
       </Link>
       <Link href="/connect" className="rail-btn" aria-current={path.startsWith("/connect") ? "page" : undefined}
         aria-label="Connect your app" title="Connect your app: put VIGIL beside your own site">
