@@ -173,13 +173,36 @@ function NormalNote({ name, v }: { name: string; v: Verdict | undefined }) {
     );
   }
   const when = bl.updated_at ? `updated ${ago(bl.updated_at)}` : `learned ${ago(bl.created_at)}`;
+  // Relearn now: forget normal and learn it again from current traffic (about 3 minutes).
+  // For when everyday traffic really changed (say 15 to 30 a second) and you don't want
+  // to wait for VIGIL to follow it by itself. The engine refuses during an open incident.
+  const relearn = () => run(async () => {
+    setState("busy");
+    try {
+      await api.post(`/api/baseline/reset?service=${encodeURIComponent(name)}`, undefined, true);
+      setState("done");
+    } catch (e) {
+      setState(e instanceof Error ? e.message : "Could not relearn");
+    }
+  });
   return (
-    <p className="node-learned" title={bl.adapting
-      ? "VIGIL keeps learning normal from healthy traffic, never from an incident, and asks before following a slow rise."
-      : "Adapting is off (VIGIL_ADAPT=0): normal stays as first learned."}>
-      <span className="node-learned-dot" data-on={bl.adapting || undefined} aria-hidden="true" />
-      normal {when}
-    </p>
+    <div className="node-learned-row">
+      <p className="node-learned" title={bl.adapting
+        ? "VIGIL keeps learning normal from healthy traffic, never from an incident, and asks before following a slow rise."
+        : "Adapting is off (VIGIL_ADAPT=0): normal stays as first learned."}>
+        <span className="node-learned-dot" data-on={bl.adapting || undefined} aria-hidden="true" />
+        normal {when}
+      </p>
+      {state === "done" ? (
+        <span className="node-relearn-ok">Relearning: about 3 min</span>
+      ) : (
+        <button type="button" className="node-relearn" onClick={relearn} disabled={state === "busy"}
+          title="Forget what normal looks like and learn it again from current traffic (about 3 minutes)">
+          {state === "busy" ? "Relearning…" : "Relearn normal"}
+        </button>
+      )}
+      {state !== "idle" && state !== "busy" && state !== "done" && <p className="node-drift-err">{state}</p>}
+    </div>
   );
 }
 

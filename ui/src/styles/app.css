@@ -726,6 +726,13 @@ a { color: var(--vigil); }
 @media (prefers-reduced-motion: reduce) { .node-state-text { animation: none; } }
 
 /* What VIGIL currently believes is normal for a service (adaptive baseline). */
+.node-learned-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.node-learned-row .node-learned { margin: 0; }
+.node-relearn { background: none; border: 1px solid rgba(237, 231, 226, 0.22); color: var(--text-2); border-radius: 999px; padding: 2px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+.node-relearn:hover { color: var(--text); border-color: var(--vigil); }
+.node-relearn:focus-visible { outline: 2px solid var(--vigil); outline-offset: 2px; }
+.node-relearn:disabled { opacity: 0.6; cursor: default; }
+.node-relearn-ok { font-size: 12px; color: var(--vigil); }
 .node-learned { margin: -2px 0 0; display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--text-3); }
 .node-learned-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: #6a605a; }
 .node-learned-dot[data-on] { background: var(--vigil); box-shadow: 0 0 0 0 rgba(79, 209, 197, 0.5); animation: vg-ping 3.2s ease-out infinite; }
