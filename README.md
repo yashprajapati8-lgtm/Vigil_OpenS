@@ -3,11 +3,11 @@
 **Watches every service. Fixes the real cause.**
 
 > ## ▶️ MUST WATCH FOR BETTER UNDERSTANDING
-> **Demo (4 min):** why downtime costs so much, how VIGIL compares with today's tools, then VIGIL fixing a stuck service and a flash sale on its own, emailing a phone as it works, and how any FastAPI app adds it.
+> **Demo (5 min):** a college results site crashing on results day, then VIGIL beside it finding the real cause and fixing it on its own, getting ready before a known rush (Results days), a real phone paying while VIGIL fixes a gray failure, the autonomy levels and kill switch, and how any FastAPI app adds it.
 >
-> **https://youtu.be/qtrbB_tZ86c**
+> **https://youtu.be/1ENBYzvn2dg**
 >
-> [![VIGIL demo: must watch](https://img.youtube.com/vi/qtrbB_tZ86c/maxresdefault.jpg)](https://youtu.be/qtrbB_tZ86c)
+> [![VIGIL demo: must watch](https://img.youtube.com/vi/1ENBYzvn2dg/maxresdefault.jpg)](https://youtu.be/1ENBYzvn2dg)
 
 VIGIL is an autonomous resilience engine for microservices. It notices when customers start
 failing, works out which service is actually broken (not just the loudest one), applies the
@@ -15,7 +15,7 @@ right fix inside strict guardrails, and only calls it done when real checkouts r
 
 | | |
 | --- | --- |
-| **▶️ MUST WATCH: demo (4 min)** | **https://youtu.be/qtrbB_tZ86c** |
+| **▶️ MUST WATCH: demo (5 min)** | **https://youtu.be/1ENBYzvn2dg** |
 | **Earlier prototype videos (Oct 2026)** | [live demo, 3 min](https://youtu.be/5g_4jCZjP8M) · [walkthrough, 5 min](https://youtu.be/AQKw7XUuKtk) |
 | **Try it in your browser** (recorded runs of this code, plus the demo videos in its **Demo** tab; nothing to install) | **https://vigil-open-s.vercel.app** |
 | **Proving Ground scorecard** | **6/6 passed** on this code (11 Nov 2026), 5 real faults and a quiet period: median detection 20.6 s, median verified recovery 1m 18s, 0 false alarms |
@@ -68,10 +68,11 @@ same machine; anywhere else it can watch and diagnose.
 
 **Disclosures.**
 - *Pre-existing work:* VIGIL started as my prototype in October 2026. The two earlier prototype
-  videos show that version. The 4-minute demo shows this version's code (the 11 Nov 2026 recorded
-  runs, the learning chart, the email alerts and the Connect tab); its phone-checkout clip and
-  checkout screenshots were filmed on the October prototype. The hosted replay plays the
-  11 Nov 2026 Proving Ground run. Everything listed under *New in this version* was built for this version.
+  videos show that version. The 5-minute demo shows this version's code: the college results
+  portal with and without VIGIL, the Results days tab, a phone paying in the demo shop, autonomy
+  and the kill switch; its alert email is from a demo-shop run. The hosted replay plays the
+  11 Nov 2026 Proving Ground runs; its Demo tab also has the earlier store demo, whose
+  phone-checkout clip was filmed on the October prototype. Everything listed under *New in this version* was built for this version.
 - *AI assistance:* I built this with an AI coding assistant (Anthropic's Claude) for code,
   tests and documentation. I directed the design and reviewed, ran and tested the results.
 - *Third-party:* Prometheus, FastAPI, scikit-learn, React and the other open-source libraries
@@ -162,7 +163,7 @@ recorded, and the hosted replay plays these five faults exactly as they happened
 ## Run it (Docker Desktop: Windows, macOS or Linux)
 
 **No install? Watch it instead:** the [hosted replay](https://vigil-open-s.vercel.app) plays real
-recorded runs in your browser, and the [4-minute demo](https://youtu.be/qtrbB_tZ86c) shows the live stack.
+recorded runs in your browser, and the [5-minute demo](https://youtu.be/1ENBYzvn2dg) shows the live stack.
 
 **You need:** [Docker Desktop](https://www.docker.com/products/docker-desktop/) running, Git, and about
 4 GB of free RAM. Optional: a free [Groq API key](https://console.groq.com/keys) for the LLM second opinion.

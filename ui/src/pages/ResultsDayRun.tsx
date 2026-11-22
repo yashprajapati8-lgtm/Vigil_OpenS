@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import { MonitorPlay } from "lucide-react";
 import { Link } from "../lib/router";
+import { LIVE_VIDEO_URL } from "../lib/links";
 
 // Demo videos: screen recordings of VIGIL running, with short explainer animations.
 // The rest of this replay plays recorded runs of the demo shop; these show the same
@@ -48,6 +49,10 @@ export function ResultsDayRun() {
   return (
     <div className="rd">
       <h1 className="page-title"><MonitorPlay size={22} aria-hidden="true" /> Demo</h1>
+      <p className="rd-lede">
+        The full demo (5 min) is on YouTube:{" "}
+        <a href={LIVE_VIDEO_URL} target="_blank" rel="noreferrer">watch it here</a>. Below: its results-day part, and a store demo with a real phone paying, each with jump buttons.
+      </p>
 
       <DemoVideo
         id="demo-results"
