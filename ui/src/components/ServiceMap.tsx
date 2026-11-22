@@ -136,7 +136,7 @@ function NormalNote({ name, v }: { name: string; v: Verdict | undefined }) {
   const run = useOperator();
   const [state, setState] = useState<"idle" | "busy" | "done" | string>("idle");
   const bl = v?.baseline;
-  if (!bl || bl.adapting === undefined || REPLAY) return null;
+  if (!bl || bl.adapting === undefined) return null;
   const drift = Object.values(bl.drift ?? {});
   if (drift.length) {
     const accept = () => run(async () => {
@@ -194,7 +194,9 @@ function NormalNote({ name, v }: { name: string; v: Verdict | undefined }) {
         normal {when}
       </p>
       {state === "done" ? (
-        <span className="node-relearn-ok">Relearning: about 3 min</span>
+        <span className="node-relearn-ok" title={REPLAY ? "Replay: the recorded normal stays as it was. On the live stack VIGIL forgets it and learns again from current traffic." : undefined}>
+          {REPLAY ? "Live stack: relearns in about 3 min" : "Relearning: about 3 min"}
+        </span>
       ) : (
         <button type="button" className="node-relearn" onClick={relearn} disabled={state === "busy"}
           title="Forget what normal looks like and learn it again from current traffic (about 3 minutes)">

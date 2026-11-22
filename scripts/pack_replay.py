@@ -16,7 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "data" / "proving-ground"
 OUT = ROOT / "ui" / "public"
-ORDER = ["slow-inventory", "bad-deploy", "flash-sale", "payment-leak", "payment-runaway"]
+ORDER = ["results-day", "slow-inventory", "bad-deploy", "flash-sale", "payment-leak", "payment-runaway"]
 
 
 def tidy(v):
@@ -34,6 +34,13 @@ def main() -> None:
     if not tapes:
         raise SystemExit(f"no recordings in {SRC / 'tapes'}: run the Proving Ground first")
     (OUT / "replay").mkdir(parents=True, exist_ok=True)
+    # Chapters already packed whose raw tape is not on this machine stay as they are.
+    kept = []
+    old_index = OUT / "replay" / "index.json"
+    if old_index.exists():
+        for ch in json.loads(old_index.read_text()).get("chapters", []):
+            if ch["scenario"] not in tapes and (OUT / "replay" / ch["file"]).exists():
+                kept.append(ch)
     chapters = []
     for name in sorted(tapes, key=lambda n: ORDER.index(n) if n in ORDER else 99):
         t = tapes[name]
@@ -41,8 +48,13 @@ def main() -> None:
         (OUT / "replay" / f"{name}.json").write_text(json.dumps(tidy(out), separators=(",", ":")))
         r = t.get("row") or {}
         chapters.append({"scenario": name, "label": t["label"], "file": f"{name}.json",
+                         "recorded_at": t["snapshot"]["taken_at"],
                          "result": {k: r.get(k) for k in ("pass", "mttd_s", "mttr_s", "actions", "root")}})
+    chapters += kept
+    chapters.sort(key=lambda c: ORDER.index(c["scenario"]) if c["scenario"] in ORDER else 99)
     recorded = min(t["snapshot"]["taken_at"] for t in tapes.values())
+    if old_index.exists():
+        recorded = min(recorded, json.loads(old_index.read_text()).get("recorded_at", recorded))
     (OUT / "replay" / "index.json").write_text(json.dumps({"recorded_at": recorded, "chapters": chapters}, indent=1))
     card = SRC / "scorecard.json"
     if card.exists():

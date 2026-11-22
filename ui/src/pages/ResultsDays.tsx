@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api } from "../api/client";
 import { useOperator } from "../lib/operator";
 import { useSite } from "../lib/site";
+import { REPLAY } from "../replay/player";
 
 // Results days: rushes the college knows are coming. The admin adds the date here
 // (no code, no restart); VIGIL starts the spare copy a few minutes before and keeps
@@ -141,7 +142,9 @@ export function ResultsDays() {
           <button type="submit" className="btn" disabled={busy === "add"}>{busy === "add" ? "Adding…" : "Add results day"}</button>
         </form>
         {note && <p className="ea-note" data-kind={note.kind} role="status">{note.text}</p>}
-        <p className="ea-sub">Adding or removing needs your operator token. No restart needed.</p>
+        <p className="ea-sub">{REPLAY
+          ? "Replay: days you add are kept in this browser only. On the live stack, VIGIL starts the spare copy when a day reaches \"Getting ready\" and the event log shows it."
+          : "Adding or removing needs your operator token. No restart needed."}</p>
       </section>
 
       <section className="panel" aria-labelledby="rd-list-title">

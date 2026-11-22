@@ -1,6 +1,7 @@
 import { ApiError } from "../api/errors";
 import type { Control } from "../api/types";
 import { player, SCENARIO_TEXT } from "./player";
+import { addResultsDay, listResultsDays, removeResultsDay } from "./resultsDays";
 
 // The same routes the live app calls, answered from the recording. Autonomy, the
 // kill switch and approvals change what plays in this browser (see player.ts); the
@@ -25,6 +26,7 @@ export async function replayRequest<T>(method: string, url: string, body?: unkno
       return Object.fromEntries(idx.chapters.map((c) => [c.scenario, { label: c.label, ...SCENARIO_TEXT[c.scenario] }])) as T;
     }
     if (path === "/chaos/status") return player.chaosStatus() as T;
+    if (path === "/api/results-days") return listResultsDays() as T;
   }
   if (method === "POST") {
     const inject = path.match(/^\/chaos\/scenarios\/([a-z-]+)\/inject$/);
@@ -40,6 +42,23 @@ export async function replayRequest<T>(method: string, url: string, body?: unkno
     if (path === "/api/operator/check") return { ok: true } as T;
     const decide = path.match(/^\/api\/incidents\/([A-Za-z0-9-]+)\/(approve|reject)$/);
     if (decide) return (decide[2] === "approve" ? await player.approve(decide[1]) : await player.reject(decide[1])) as T;
+    if (path === "/api/results-days") return addResultsDay((body ?? {}) as Parameters<typeof addResultsDay>[0]) as T;
+    const removeDay = path.match(/^\/api\/results-days\/([^/]+)\/remove$/);
+    if (removeDay) return removeResultsDay(decodeURIComponent(removeDay[1])) as T;
+    if (path === "/api/baseline/reset" || path === "/api/baseline/accept") {
+      // Same refusal as the engine; the recording's normal itself does not change.
+      const service = new URLSearchParams(url.split("?")[1] ?? "").get("service") ?? "";
+      let busy = false;
+      for (const inc of player.incidentList()) {
+        const open = !["RESOLVED", "SELF_RESOLVED", "ESCALATED"].includes(inc.status);
+        if (open && (!service || inc.services.includes(service))) busy = true;
+      }
+      if (busy) {
+        throw new ApiError(409, path.endsWith("reset") ? "cannot relearn during an open incident"
+          : "cannot accept a new normal during an open incident");
+      }
+      return (path.endsWith("reset") ? { relearning: [service] } : { service, accepted: [] }) as T;
+    }
     if (path === "/api/store/pay") throw new ApiError(503, "The demo shop needs the live stack: this page is a replay");
     throw new ApiError(403, LIVE_ONLY);
   }

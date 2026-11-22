@@ -33,6 +33,7 @@ export interface Chapter {
   scenario: string;
   label: string;
   file: string;
+  recorded_at?: number;   // when this run was recorded (older packs: only the index has it)
   result?: { pass?: boolean; mttd_s?: number | null; mttr_s?: number | null; actions?: string[]; root?: string | null };
 }
 interface Index { recorded_at: number; chapters: Chapter[] }
@@ -442,6 +443,7 @@ class Player {
 export const player = new Player();
 
 export const SCENARIO_TEXT: Record<string, { description: string; target: string }> = {
+  "results-day": { description: "Results are declared: 60 students a second, more than one copy of results-api can serve (about 40). Nothing is broken, and /health still says OK.", target: "results-api" },
   "slow-inventory": { description: "Inventory requests stall for 1.5 s. Payment starts timing out on it, but every health check stays green.", target: "inventory" },
   "payment-leak": { description: "Payment leaks 3 MB/s and would hit its 256 MB limit in about a minute.", target: "payment" },
   "flash-sale": { description: "Real demand: checkout traffic jumps 6x, more than one payment instance can serve. Nothing is broken.", target: "loadgen" },

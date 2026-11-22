@@ -1,9 +1,10 @@
-import { CalendarDays, FlaskConical, Plug, ShoppingBag, Smartphone, Trophy, TriangleAlert } from "lucide-react";
+import { CalendarDays, FlaskConical, GraduationCap, Plug, ShoppingBag, Smartphone, Trophy, TriangleAlert } from "lucide-react";
 import { TERMINAL } from "../api/types";
 import { Link } from "../lib/router";
 import { useVigil } from "../state/vigil";
 import { useSite } from "../lib/site";
 import { Logo } from "./Logo";
+import { REPLAY } from "../replay/player";
 
 export function Rail({ path, chaosOpen, onChaos }: { path: string; chaosOpen: boolean; onChaos: () => void }) {
   const { incidents, connected } = useVigil();
@@ -27,6 +28,12 @@ export function Rail({ path, chaosOpen, onChaos }: { path: string; chaosOpen: bo
         aria-label="Results days" title="Results days: get ready before a rush you know is coming">
         <CalendarDays size={22} strokeWidth={1.75} />
       </Link>
+      {REPLAY && (
+        <Link href="/results-day-demo" className="rail-btn" aria-current={path.startsWith("/results-day-demo") ? "page" : undefined}
+          aria-label="Results day: the college demo" title="Results day: the college demo (recorded video)">
+          <GraduationCap size={22} strokeWidth={1.75} />
+        </Link>
+      )}
       <Link href="/connect" className="rail-btn" aria-current={path.startsWith("/connect") ? "page" : undefined}
         aria-label="Connect your app" title="Connect your app: put VIGIL beside your own site">
         <Plug size={22} strokeWidth={1.75} />
