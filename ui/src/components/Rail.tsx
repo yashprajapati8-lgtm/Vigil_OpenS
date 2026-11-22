@@ -1,4 +1,4 @@
-import { CalendarDays, FlaskConical, GraduationCap, Plug, ShoppingBag, Smartphone, Trophy, TriangleAlert } from "lucide-react";
+import { CalendarDays, FlaskConical, MonitorPlay, Plug, ShoppingBag, Smartphone, Trophy, TriangleAlert } from "lucide-react";
 import { TERMINAL } from "../api/types";
 import { Link } from "../lib/router";
 import { useVigil } from "../state/vigil";
@@ -29,9 +29,9 @@ export function Rail({ path, chaosOpen, onChaos }: { path: string; chaosOpen: bo
         <CalendarDays size={22} strokeWidth={1.75} />
       </Link>
       {REPLAY && (
-        <Link href="/results-day-demo" className="rail-btn" aria-current={path.startsWith("/results-day-demo") ? "page" : undefined}
-          aria-label="Results day: the college demo" title="Results day: the college demo (recorded video)">
-          <GraduationCap size={22} strokeWidth={1.75} />
+        <Link href="/demo" className="rail-btn" aria-current={path === "/demo" || path.startsWith("/results-day-demo") ? "page" : undefined}
+          aria-label="Demo videos" title="Demo: the college results day and the online store, on video">
+          <MonitorPlay size={22} strokeWidth={1.75} />
         </Link>
       )}
       <Link href="/connect" className="rail-btn" aria-current={path.startsWith("/connect") ? "page" : undefined}

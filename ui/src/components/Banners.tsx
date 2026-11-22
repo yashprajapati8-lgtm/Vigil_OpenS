@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import type { Point } from "../api/types";
 import { player, REPLAY, REPO_URL } from "../replay/player";
 import { duration } from "../lib/format";
-import { LIVE_VIDEO_URL } from "../lib/links";
+import { Link } from "../lib/router";
 import { useVigil } from "../state/vigil";
 import { LearningChart } from "./LearningChart";
 
@@ -163,7 +163,7 @@ function ReplayBanner() {
         <button type="button" className="btn btn-small btn-chaos" onClick={() => window.dispatchEvent(new Event("vigil:open-chaos"))}>
           <FlaskConical size={15} /> Pick a fault
         </button>
-        <a className="btn btn-small btn-primary" href={LIVE_VIDEO_URL} target="_blank" rel="noreferrer"><Play size={14} /> Watch the demo (4 min)</a>
+        <Link href="/demo" className="btn btn-small btn-primary"><Play size={14} /> Watch the demo</Link>
         {REPO_URL && <a className="btn btn-small" href={REPO_URL} target="_blank" rel="noreferrer">Run it live</a>}
       </span>
     </div>

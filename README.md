@@ -17,16 +17,16 @@ right fix inside strict guardrails, and only calls it done when real checkouts r
 | --- | --- |
 | **▶️ MUST WATCH: demo (4 min)** | **https://youtu.be/qtrbB_tZ86c** |
 | **Earlier prototype videos (Oct 2026)** | [live demo, 3 min](https://youtu.be/5g_4jCZjP8M) · [walkthrough, 5 min](https://youtu.be/AQKw7XUuKtk) |
-| **Try it in your browser** (the 11 Nov 2026 recorded runs on this round's code, nothing to install) | **https://vigil-open-s.vercel.app** |
-| **Proving Ground scorecard** | **6/6 passed** on this round's code (11 Nov 2026), 5 real faults and a quiet period: median detection 20.6 s, median verified recovery 1m 18s, 0 false alarms |
+| **Try it in your browser** (recorded runs of this code, plus the demo videos in its **Demo** tab; nothing to install) | **https://vigil-open-s.vercel.app** |
+| **Proving Ground scorecard** | **6/6 passed** on this code (11 Nov 2026), 5 real faults and a quiet period: median detection 20.6 s, median verified recovery 1m 18s, 0 false alarms |
 
-## CodeQuest Round 2: what this repository is
+## What this repository is
 
 **VIGIL as an open-source layer you can put beside your own site.** The October 2026 prototype
-(disclosed below) was one demo shop; this round turns it into something any site can use and
+(disclosed below) was one demo shop; this version turns it into something any site can use and
 adds what a real deployment needs.
 
-**New in this round (10 to 12 Nov 2026):**
+**New in this version:**
 
 - **Adaptive baseline.** After the first 3 minutes VIGIL keeps learning normal from healthy
   traffic (2 h window, re-learned every 10 min), never from an incident, and reports a slow rise
@@ -48,6 +48,11 @@ adds what a real deployment needs.
   when it fixes something on its own (what it found, every step), needs approval, escalates,
   can't see your services, or a service's normal keeps rising. Once per incident each, off unless
   configured (see *Email alerts* below).
+- **Results days.** An admin adds a known rush (results being declared) in the console's
+  *Results days* tab, with no code change and no restart; VIGIL starts the spare copy a few
+  minutes before it and keeps it for the rush. Also settable in `vigil.yaml` (`events`).
+- **Relearn normal.** One click on a service card relearns that service's normal when traffic
+  has genuinely changed (refused during an open incident).
 - **Fixed:** the console's *Fresh start* button never sent the operator token, so it silently failed.
 
 **Proving Ground on the new code (11 Nov 2026):** all 6 scenarios passed across two sessions. The
@@ -63,10 +68,10 @@ same machine; anywhere else it can watch and diagnose.
 
 **Disclosures.**
 - *Pre-existing work:* VIGIL started as my prototype in October 2026. The two earlier prototype
-  videos show that version. The 4-minute demo shows this round's code (the 11 Nov 2026 recorded
+  videos show that version. The 4-minute demo shows this version's code (the 11 Nov 2026 recorded
   runs, the learning chart, the email alerts and the Connect tab); its phone-checkout clip and
   checkout screenshots were filmed on the October prototype. The hosted replay plays the
-  11 Nov 2026 Proving Ground run. Everything listed under *New in this round* was built for this round.
+  11 Nov 2026 Proving Ground run. Everything listed under *New in this version* was built for this version.
 - *AI assistance:* I built this with an AI coding assistant (Anthropic's Claude) for code,
   tests and documentation. I directed the design and reviewed, ran and tested the results.
 - *Third-party:* Prometheus, FastAPI, scikit-learn, React and the other open-source libraries
@@ -118,7 +123,7 @@ Every 5 seconds it runs one loop: **observe → detect → diagnose → decide �
 `docker compose --profile prove run --rm proving-ground` injects every fault for real, scores
 VIGIL against an answer key it never sees, and checks for false alarms during a quiet period.
 
-Final run on this round's code (2 sessions on 11 Nov 2026, autonomy L3; flash sale and bad deploy
+Final run on this version's code (2 sessions on 11 Nov 2026, autonomy L3; flash sale and bad deploy
 are from the second session, see above). Times are from the moment the fault was injected:
 
 | Scenario | Expected fix | VIGIL's root | VIGIL's fix | Detect | Recovered | Checkouts lost | Result |

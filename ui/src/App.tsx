@@ -67,7 +67,7 @@ function Console({ path }: { path: string }) {
     <Connect />
   ) : path.startsWith("/results-days") ? (
     <ResultsDays />
-  ) : path.startsWith("/results-day-demo") ? (
+  ) : path === "/demo" || path.startsWith("/demo/") || path.startsWith("/results-day-demo") ? (
     <ResultsDayRun />
   ) : path.startsWith("/incidents") ? (
     <Incidents />
@@ -83,7 +83,7 @@ function Console({ path }: { path: string }) {
     const name = incidentId ? incidentId : path.startsWith("/proving-ground") ? "Proving Ground"
       : path.startsWith("/incidents") ? "Incidents" : path.startsWith("/phones") ? "Phone checkout"
       : path.startsWith("/connect") ? "Connect your app" : path.startsWith("/results-days") ? "Results days"
-      : path.startsWith("/results-day-demo") ? "Results day demo" : "Mission";
+      : path === "/demo" || path.startsWith("/results-day-demo") ? "Demo" : "Mission";
     document.title = `VIGIL | ${name}`;
   }, [path, incidentId]);
 

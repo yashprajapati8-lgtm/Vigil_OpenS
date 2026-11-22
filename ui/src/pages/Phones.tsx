@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { clock } from "../lib/format";
 import { usePhones, rupees, PRODUCT_NAMES } from "../lib/phones";
 import { REPLAY } from "../replay/player";
-import { GITHUB_URL, LIVE_VIDEO_URL, PHONE_README_URL } from "../lib/links";
+import { GITHUB_URL, PHONE_README_URL } from "../lib/links";
+import { Link } from "../lib/router";
 
 // Let anyone pay from a phone. The QR code opens the demo checkout (/pay); each
 // phone on it says hello every 5 s, and every payment lands here with how long it
@@ -110,7 +111,7 @@ export function Phones() {
             payment fails, then you watch VIGIL fix it and your next payment goes through. No real money moves.
           </p>
           <div className="phones-actions">
-            <a className="btn btn-primary" href={LIVE_VIDEO_URL} target="_blank" rel="noreferrer"><Play size={16} /> Watch a phone pay in the demo (4 min)</a>
+            <Link href="/demo" className="btn btn-primary"><Play size={16} /> Watch a phone pay in the demo</Link>
             <a className="btn" href={PHONE_README_URL} target="_blank" rel="noreferrer"><FolderGit2 size={16} /> Run it yourself from GitHub</a>
           </div>
         </section>

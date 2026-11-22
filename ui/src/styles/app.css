@@ -965,3 +965,6 @@ a { color: var(--vigil); }
 .rdr-chapters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
 .rdr-facts { margin: 0; padding-left: 20px; max-width: 72ch; line-height: 1.55; }
 .rdr-facts li { margin-bottom: 8px; }
+.rdr-section { margin-top: 18px; }
+.rdr-title { margin: 0 0 6px; font-size: 20px; font-weight: 600; }
+.rdr-try { margin: 18px 4px 8px; color: var(--ink2, inherit); }

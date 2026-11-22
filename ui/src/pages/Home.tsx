@@ -1,5 +1,4 @@
 import { BookOpen, FolderGit2, MonitorPlay, Play } from "lucide-react";
-import { LIVE_VIDEO_URL } from "../lib/links";
 import { useEffect, useState } from "react";
 import { GlassField, TiltCard } from "../components/GlassField";
 import { Logo } from "../components/Logo";
@@ -157,7 +156,7 @@ export function Home() {
             </p>
             <div className="hero-ctas">
               <Link href="/console" className="btn btn-primary btn-lg"><MonitorPlay size={18} /> Open the console</Link>
-              <a className="btn btn-lg" href={LIVE_VIDEO_URL} target="_blank" rel="noreferrer"><Play size={18} /> Watch the demo (4 min)</a>
+              <Link href="/demo" className="btn btn-lg"><Play size={18} /> Watch the demo</Link>
               {REPO_URL && <a className="btn btn-lg" href={REPO_URL} target="_blank" rel="noreferrer"><FolderGit2 size={18} /> Code on GitHub</a>}
             </div>
             <p className="hero-note">
@@ -272,7 +271,7 @@ export function Home() {
             <li><b>Console</b> React, TypeScript, Vite, live server-sent events</li>
             <li><b>Runs on</b> Docker Compose: 3 services, load generator, chaos controller</li>
           </ul>
-          <p className="team">Built by Yash Prajapati (team Yash_P) for the Baloon National Hackathon 2026.</p>
+          <p className="team">Built by Yash Prajapati.</p>
         </section>
       </main>
 
